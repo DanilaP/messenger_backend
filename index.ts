@@ -6,6 +6,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import AuthMiddleware from './src/middlewares/auth-middleware'; 
 import AuthRouter from './src/controllers/auth/router';
+import DialogsRouter from './src/controllers/dialogs/router';
 
 require('dotenv').config();
 
@@ -27,6 +28,7 @@ app.use(express.static('./static'));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/auth", AuthRouter);
+app.use("/dialogs", DialogsRouter);
 
 initWebSocket(server);
 

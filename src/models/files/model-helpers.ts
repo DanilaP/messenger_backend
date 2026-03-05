@@ -25,7 +25,7 @@ export async function insertFiles(client: PoolClient, files: Omit<IFile, 'id'>[]
                 $2::text[],
                 $3::int[],
                 $4::text[],
-                $5::text[]
+                $5::int[]
             )
             RETURNING id, name, url, size, type, message_id
         `,

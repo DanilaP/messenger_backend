@@ -3,6 +3,8 @@ import { IUser } from "../models/users/users";
 import { db } from "../models/db";
 import jwt from "jsonwebtoken";
 
+require('dotenv').config();
+
 async function getUserFromToken(req: Request) {
     try {
         const token = req.cookies.token; 
@@ -24,7 +26,7 @@ function generateAccessToken(id: any) {
     const payload = {
         id: id,
     };
-    const token = jwt.sign(payload, "SECRET_KEY_RANDOM", { expiresIn: "24h" });
+    const token = jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: "24h" });
     return token;
 }
 
