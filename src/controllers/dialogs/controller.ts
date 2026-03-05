@@ -25,8 +25,8 @@ class DialogsController {
                 const message = {
                     text: text || "",
                     date: moment(Date.now()).format('DD:MM:YYYY HH:mm:ss'),
-                    dialog_id: dialogId || "",
-                    sender_id: userId,
+                    dialog_id: Number(dialogId) || "",
+                    sender_id: Number(userId),
                     files: req.files ? (await fsHelpers.uploadFiles(req.files)).filelist : []
                 };
 
@@ -101,7 +101,7 @@ class DialogsController {
                     `INSERT INTO messages (text, date, dialog_id, sender_id) 
                     VALUES ($1, $2, $3, $4) 
                     RETURNING id, text, date, dialog_id, sender_id`,
-                    [text, message.date, message.dialog_id, message.sender_id]
+                    [text, message.date, Number(message.dialog_id), Number(message.sender_id)]
                 );
 
                 if (createdMessage.rows.length === 0) {
