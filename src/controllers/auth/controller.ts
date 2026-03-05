@@ -4,11 +4,13 @@ import { db } from '../../models/db';
 import { IUser } from '../../models/users/users';
 import bcrypt from 'bcryptjs';
 import userHelpers from '../../helpers/user-helpers';
+require('dotenv').config();
 
 class AuthController {
     static async registration(req: Request, res: Response) {
         try {
             const { login, password, name, surname, lastname } = req.body;
+            const avatar = `${ process.env.HOST_URL }/files/avatar.jpeg`;
 
             if (validateEmail(login) && password && name && surname) {
                 const saltRounds = 10;
@@ -16,10 +18,10 @@ class AuthController {
 
                 try {
                     const result = await db.query<IUser>(
-                        `INSERT INTO users (login, password, name, surname, lastname) 
-                        VALUES ($1, $2, $3, $4, $5) 
-                        RETURNING id, login, name, surname, lastname, status`,
-                        [login, hashedPassword, name, surname, lastname]
+                        `INSERT INTO users (login, password, name, surname, lastname, avatar) 
+                        VALUES ($1, $2, $3, $4, $5, $6) 
+                        RETURNING id, login, name, surname, lastname, status, avatar`,
+                        [login, hashedPassword, name, surname, lastname, avatar]
                     );
 
                     if (result.rows[0]) {

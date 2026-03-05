@@ -5,5 +5,6 @@ export interface IUser {
     name: string,
     surname: string,
     lastname: string | null,
-    status: null
+    status: null,
+    avatar: string
 }
