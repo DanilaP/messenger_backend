@@ -1,12 +1,17 @@
 import { Request, Response } from "express";
-import User from "../models/user/user";
+import { IUser } from "../models/users/users";
+import { db } from "../models/db";
 import jwt from "jsonwebtoken";
 
 async function getUserFromToken(req: Request) {
     try {
         const token = req.cookies.token; 
         const userId = jwt.decode(token);
-        const user = await User.findOne({ _id: (userId as jwt.JwtPayload).id });
+        const result = await db.query<IUser>(
+            `SELECT * FROM users WHERE id = $1`,
+            [userId]
+        );
+        const user = result.rows[0];
         return user;
     } 
     catch (error) {

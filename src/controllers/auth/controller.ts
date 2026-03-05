@@ -3,6 +3,7 @@ import { validateEmail } from '../../helpers/validation-helpers';
 import { db } from '../../models/db';
 import { IUser } from '../../models/users/users';
 import bcrypt from 'bcryptjs';
+import userHelpers from '../../helpers/user-helpers';
 
 class AuthController {
     static async registration(req: Request, res: Response) {
@@ -20,7 +21,11 @@ class AuthController {
                         RETURNING id, login, name, surname, lastname, status`,
                         [login, hashedPassword, name, surname, lastname]
                     );
+
                     if (result.rows[0]) {
+                        const token = userHelpers.generateAccessToken(result.rows[0].id);
+                        userHelpers.setTokenToTheResponse(res, token);
+
                         res.status(200).json({ message: "Успешная регистрация", user: result.rows[0] });
                         return;
                     }
@@ -45,6 +50,65 @@ class AuthController {
         catch (error) {
             res.status(500).json({ message: "Ошибка при регистрации" });
             console.log(error);
+            return;
+        }
+    }
+    static async login(req: Request, res: Response) {
+        try {
+            const { login, password } = req.body;
+
+            if (login && password) {
+                const result = await db.query<IUser>(
+                    `SELECT id, login, password, name, surname, lastname, status
+                    FROM users
+                    WHERE login = $1`,
+                    [login]
+                );
+                const user = result.rows[0];
+
+                if (!user) {
+                    res.status(401).json({ message: 'Неверный логин или пароль' });
+                    return
+                }
+
+                if (user.password) {
+                    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+                    if (!isPasswordValid) {
+                        res.status(401).json({ message: 'Неверный логин или пароль' });
+                        return;
+                    }
+
+                    const { password: _, ...userWithoutPassword } = user;
+
+                    const token = userHelpers.generateAccessToken(user.id);
+                    userHelpers.setTokenToTheResponse(res, token);
+
+                    res.status(200).json({
+                        message: 'Успешный вход',
+                        user: userWithoutPassword
+                    });
+                    return;
+                }
+            }
+            res.status(400).json({ message: "Логин и пароль не должны быть пустыми" });
+            return;
+        }
+        catch (error) {
+            res.status(500).json({ message: "Ошибка при входе" });
+            console.log(error);
+            return;
+        }
+    }
+    static async logout(req: Request, res: Response) {
+        try {
+            res.clearCookie("token");
+            res.status(200).send('Успешный выход из аккаунта');
+            return;
+        }
+        catch (error) {
+            console.error(error);
+            res.status(500).send('Ошибка выхода из аккаунта');
             return;
         }
     }
