@@ -5,14 +5,13 @@ import http from 'http';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import AuthMiddleware from './src/middlewares/auth-middleware'; 
-import AuthRouter from './src/controllers/auth/router'; 
+import AuthRouter from './src/controllers/auth/router';
 
 require('dotenv').config();
 
 const PORT = process.env.PORT;
 const app = express();
 const server = http.createServer(app);
-const DB_URL = process.env.DB_URL as string;
 
 app.use(cors({ 
     origin: 'http://localhost:3000',
@@ -27,13 +26,12 @@ app.use(express.json());
 app.use(express.static('./static'));
 app.use(express.urlencoded({ extended: true }));
 
-app.use('/auth', AuthRouter);
+app.use("/auth", AuthRouter);
 
 initWebSocket(server);
 
 async function startApp() {
     try {
-        
         server.listen(PORT, () => console.log('Server started at PORT' + " " + PORT));
     } catch (error) {
         console.error(error);
