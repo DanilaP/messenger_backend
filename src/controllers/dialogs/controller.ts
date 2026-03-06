@@ -178,8 +178,23 @@ class DialogsController {
     }
     static async getUserDialogInfo(req: Request, res: Response) {
         try {
-            
-        }
+            /* Получение информации о диалоге пользователя
+                SELECT DISTINCT
+                    dialogs_members.dialog_id,
+                    messages.id as message_id,
+                    messages.text,
+                    messages.date,
+                    messages.sender_id,
+                    files.name,
+                    files.size,
+                    files.type,
+                    files.url
+                FROM dialogs_members
+                JOIN messages ON messages.dialog_id = dialogs_members.dialog_id
+                left JOIN files ON files.message_id = messages.id 
+                WHERE dialogs_members.dialog_id = 9;
+            */
+        }  
         catch (error) {
             res.status(500).json({ message: "Ошибка при получении информации о диалоге" });
             console.log(error);
