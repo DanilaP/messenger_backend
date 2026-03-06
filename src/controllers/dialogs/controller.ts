@@ -168,7 +168,24 @@ class DialogsController {
     }
     static async getUserDialogs(req: Request, res: Response) {
         try {
-            
+            /*
+                SELECT DISTINCT ON (messages.dialog_id) 
+                    messages.text, 
+                    messages.date, 
+                    messages.dialog_id, 
+                    messages.sender_id,
+                    users.name,
+                    users.surname,
+                    users.avatar
+                FROM messages
+                JOIN users ON users.id = messages.sender_id
+                WHERE messages.dialog_id IN (
+                    SELECT dialog_id 
+                    FROM dialogs_members 
+                    WHERE user_id = 15
+                )
+                ORDER BY messages.dialog_id, messages.date DESC NULLS LAST, messages.id DESC;
+            */
         }
         catch (error) {
             res.status(500).json({ message: "Ошибка при получении диалогов" });
