@@ -178,22 +178,46 @@ class DialogsController {
     }
     static async getUserDialogInfo(req: Request, res: Response) {
         try {
-            /* Получение информации о диалоге пользователя
-                SELECT DISTINCT
-                    dialogs_members.dialog_id,
+            const dialogId = Number(req.query.id);
+            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
+            const userId = Number(payload.id);
+
+            const dialog = await db.query(
+                `SELECT 
                     messages.id as message_id,
                     messages.text,
                     messages.date,
                     messages.sender_id,
-                    files.name,
-                    files.size,
-                    files.type,
-                    files.url
-                FROM dialogs_members
-                JOIN messages ON messages.dialog_id = dialogs_members.dialog_id
-                left JOIN files ON files.message_id = messages.id 
-                WHERE dialogs_members.dialog_id = 9;
-            */
+                    COALESCE(
+                        json_agg(
+                            json_build_object('name', files.name, 'size', files.size, 'type', files.type, 'url', files.url)
+                            ORDER BY files.id
+                        ) FILTER (WHERE files.id IS NOT NULL),
+                        '[]'::json
+                    ) as files
+                FROM messages
+                LEFT JOIN files ON files.message_id = messages.id
+                WHERE messages.dialog_id = $1
+                GROUP BY messages.id, messages.dialog_id, messages.text, messages.date, messages.sender_id
+                ORDER BY messages.date
+                `,
+                [dialogId]
+            );
+
+            let isMember = false;
+            dialog.rows.map(message => {
+                if (message.sender_id === userId) {
+                    isMember = true;
+                }
+            });
+
+            if (isMember) {
+                res.status(200).json({ message: "Успешное получение информации о диалоге", dialog: dialog.rows });
+                return;
+            }
+            
+            res.status(403).json({ message: "Вы не являетесь участником данного диалога!" });
+            return;
         }  
         catch (error) {
             res.status(500).json({ message: "Ошибка при получении информации о диалоге" });
