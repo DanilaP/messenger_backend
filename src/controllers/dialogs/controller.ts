@@ -166,78 +166,102 @@ class DialogsController {
             return;
         }
     }
-    static async getUserDialogs(req: Request, res: Response) {
-        try {
-            /*
-                SELECT DISTINCT ON (messages.dialog_id) 
-                    messages.text, 
-                    messages.date, 
-                    messages.dialog_id, 
-                    messages.sender_id,
-                    users.name,
-                    users.surname,
-                    users.avatar
-                FROM messages
-                JOIN users ON users.id = messages.sender_id
-                WHERE messages.dialog_id IN (
-                    SELECT dialog_id 
-                    FROM dialogs_members 
-                    WHERE user_id = 15
-                )
-                ORDER BY messages.dialog_id, messages.date DESC NULLS LAST, messages.id DESC;
-            */
-        }
-        catch (error) {
-            res.status(500).json({ message: "Ошибка при получении диалогов" });
-            console.log(error);
-            return;
-        }
-    }
-    static async getUserDialogInfo(req: Request, res: Response) {
+    static async getUserDialogsInfo(req: Request, res: Response) {
         try {
             const dialogId = Number(req.query.id);
             const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
             const userId = Number(payload.id);
 
-            const dialog = await db.query(
-                `SELECT 
-                    messages.id as message_id,
-                    messages.text,
-                    messages.date,
-                    messages.sender_id,
-                    COALESCE(
-                        json_agg(
-                            json_build_object('name', files.name, 'size', files.size, 'type', files.type, 'url', files.url)
-                            ORDER BY files.id
-                        ) FILTER (WHERE files.id IS NOT NULL),
-                        '[]'::json
-                    ) as files
-                FROM messages
-                LEFT JOIN files ON files.message_id = messages.id
-                WHERE messages.dialog_id = $1
-                GROUP BY messages.id, messages.dialog_id, messages.text, messages.date, messages.sender_id
-                ORDER BY messages.date
-                `,
-                [dialogId]
-            );
+            //Получение информации о конкретном диалоге
+            if (dialogId) {
+                const dialog = await db.query(
+                    `SELECT 
+                        messages.id as message_id,
+                        messages.text,
+                        messages.date,
+                        messages.sender_id,
+                        COALESCE(
+                            json_agg(
+                                json_build_object('name', files.name, 'size', files.size, 'type', files.type, 'url', files.url)
+                                ORDER BY files.id
+                            ) FILTER (WHERE files.id IS NOT NULL),
+                            '[]'::json
+                        ) as files
+                    FROM messages
+                    LEFT JOIN files ON files.message_id = messages.id
+                    WHERE messages.dialog_id = $1
+                    GROUP BY messages.id, messages.dialog_id, messages.text, messages.date, messages.sender_id
+                    ORDER BY messages.date
+                    `,
+                    [dialogId]
+                );
 
-            let isMember = false;
-            dialog.rows.map(message => {
-                if (message.sender_id === userId) {
-                    isMember = true;
+                let isMember = false;
+                dialog.rows.map(message => {
+                    if (message.sender_id === userId) {
+                        isMember = true;
+                    }
+                });
+
+                if (isMember) {
+                    res.status(200).json({ message: "Успешное получение информации о диалоге", dialog: dialog.rows });
+                    return;
                 }
-            });
-
-            if (isMember) {
-                res.status(200).json({ message: "Успешное получение информации о диалоге", dialog: dialog.rows });
+                
+                res.status(403).json({ message: "Вы не являетесь участником данного диалога!" });
                 return;
             }
-            
-            res.status(403).json({ message: "Вы не являетесь участником данного диалога!" });
-            return;
+            //Получение всех диалогов
+            else {  
+                const dialogs = await db.query(
+                    `SELECT json_agg(
+                        json_build_object(
+                            'dialog_id', sub.dialog_id,
+                            'last_message', json_build_object(
+                                'text', sub.text,
+                                'date', sub.date
+                                -- при необходимости можно добавить 'sender_id', sub.sender_id
+                            ),
+                            'opponent', json_build_object(
+                                'id', sub.opponent_id,
+                                'name', sub.name,
+                                'surname', sub.surname,
+                                'avatar', sub.avatar
+                            )
+                        )
+                    ) AS result
+                    FROM (
+                        SELECT DISTINCT ON (messages.dialog_id) 
+                            messages.text, 
+                            messages.date, 
+                            messages.dialog_id, 
+                            messages.sender_id,
+                            dialogs_members.user_id AS opponent_id,
+                            users.name,
+                            users.surname,
+                            users.avatar
+                        FROM messages
+                        JOIN dialogs_members 
+                            ON dialogs_members.dialog_id = messages.dialog_id 
+                            AND dialogs_members.user_id != $1
+                        JOIN users 
+                            ON users.id = dialogs_members.user_id
+                        WHERE messages.dialog_id IN (
+                            SELECT dialog_id 
+                            FROM dialogs_members 
+                            WHERE user_id = $1
+                        )
+                        ORDER BY messages.dialog_id, messages.date DESC NULLS LAST, messages.id DESC
+                    ) sub
+                    `,
+                    [userId]
+                );
+                res.status(200).json({ message: "Список диалогов успешно получен", dialogs: dialogs.rows[0].result });
+                return;
+            }
         }  
         catch (error) {
-            res.status(500).json({ message: "Ошибка при получении информации о диалоге" });
+            res.status(500).json({ message: "Ошибка при получении информации о диалогах" });
             console.log(error);
             return;
         }

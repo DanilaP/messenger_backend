@@ -3,6 +3,6 @@ import DialogsController from './controller';
 const router = Router();
 
 router.post('/message/send', DialogsController.sendMessage);
-router.get('/', DialogsController.getUserDialogInfo);
+router.get('/', DialogsController.getUserDialogsInfo);
 
 export default router;
