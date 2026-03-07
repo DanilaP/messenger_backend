@@ -220,7 +220,6 @@ class DialogsController {
                             'last_message', json_build_object(
                                 'text', sub.text,
                                 'date', sub.date
-                                -- при необходимости можно добавить 'sender_id', sub.sender_id
                             ),
                             'opponent', json_build_object(
                                 'id', sub.opponent_id,
