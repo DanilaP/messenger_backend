@@ -158,7 +158,31 @@ class DialogsController {
     }
     static async changeMessage(req: Request, res: Response) {
         try {
-            
+            const { dialogId, messageId, text } = req.body;
+            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
+            const userId = Number(payload.id);
+
+            if (dialogId && messageId && text) {
+                const updatedMessage = await db.query(
+                    `
+                        UPDATE messages
+                        SET text = $4
+                        WHERE messages.dialog_id = $2 and messages.sender_id = $1 and messages.id = $3;
+                    `,
+                    [userId, dialogId, messageId, text]
+                );
+                
+                if (updatedMessage.rowCount === 0) {
+                    res.status(500).json({ 
+                        message: "Ошибка при изменении сообщения. Ошибка записи данных" 
+                    });
+                    return;
+                }
+                res.status(200).json({ message: "Сообщение успешно изменено" });
+                return;
+            }
+            res.status(400).json({ message: "Ошибка при изменении сообщения. Данные о сообщении не должны быть пустыми" });
+            return;
         }
         catch (error) {
             res.status(500).json({ message: "Ошибка при изменении сообщения" });
