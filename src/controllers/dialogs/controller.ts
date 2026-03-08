@@ -356,7 +356,7 @@ class DialogsController {
         try {
             await client.query('BEGIN');
 
-            const { dialogId } = req.body;
+            const dialogId = Number(req.query.id);
             const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
             const userId = Number(payload.id);
 
