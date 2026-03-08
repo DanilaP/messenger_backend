@@ -147,13 +147,74 @@ class DialogsController {
         }
     }
     static async deleteMessages(req: Request, res: Response) {
-        try {
-            
+        const client = await db.getClient();
+
+        try {   
+            await client.query('BEGIN');
+
+            const { dialogId, messagesIds } = req.body;
+            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
+            const userId = Number(payload.id);
+
+            if (userId && dialogId && messagesIds.length > 0) {
+                //Удаляем ссылки на файлы статики из бд
+                const deletedFilesResult = await client.query(
+                    `
+                        DELETE FROM files
+                        WHERE message_id = ANY($1::int[])
+                        RETURNING url
+                    `,
+                    [messagesIds]
+                );
+                
+                const deletedFilesUrls = deletedFilesResult.rows.map(row => {
+                    return row.url.replace(process.env.HOST_URL, `./static`);
+                });
+                const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
+                //Удаляем статику 
+                
+                if (deleteFilesStatus.status === 500) {
+                    await client.query('ROLLBACK');
+                    res.status(500).json({ 
+                        message: "Ошибка при удалении сообщений. Ошибка при удалении медиа файлов" 
+                    });
+                    return;
+                }
+
+                //Удаляем сообщения из бд
+                const deletedMessagesResult = await client.query(
+                    `
+                        DELETE FROM messages
+                        WHERE dialog_id = $1 AND id = ANY($2::int[]) and sender_id = $3
+                    `,
+                    [dialogId, messagesIds, userId]
+                );
+                const deletedCount = deletedMessagesResult.rowCount; 
+
+                if (deletedCount === 0) {
+                    await client.query('ROLLBACK');
+                    res.status(500).json({ message: "Ошибка при удалении сообщений. Сообщения или диалог не найдены" });
+                    return;
+                }
+
+                await client.query('COMMIT');
+                res.status(200).json({ message: "Сообщения успешно удалены" });
+                return;
+            }
+            await client.query('ROLLBACK');
+            res.status(500).json({ 
+                message: "Ошибка при удалении сообщений. Информация о диалоге и сообщениях не должна быть пустой" 
+            });
+            return;
         }
         catch (error) {
+            await client.query('ROLLBACK');
             res.status(500).json({ message: "Ошибка при удалении сообщений" });
             console.log(error);
             return;
+        }
+        finally {
+            client.release();
         }
     }
     static async changeMessage(req: Request, res: Response) {
