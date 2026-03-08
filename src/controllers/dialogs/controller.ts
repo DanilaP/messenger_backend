@@ -98,7 +98,7 @@ class DialogsController {
                 
                 //Добавляем в бд сообщение
                 const createdMessage = await client.query<IMessage>(
-                    `INSERT INTO messages (text, date, dialog_id, sender_id) 
+                    `INSERT INTO dialogs_messages (text, date, dialog_id, sender_id) 
                     VALUES ($1, $2, $3, $4) 
                     RETURNING id, text, date, dialog_id, sender_id`,
                     [text, message.date, Number(message.dialog_id), Number(message.sender_id)]
@@ -184,7 +184,7 @@ class DialogsController {
                 //Удаляем сообщения из бд
                 const deletedMessagesResult = await client.query(
                     `
-                        DELETE FROM messages
+                        DELETE FROM dialogs_messages
                         WHERE dialog_id = $1 AND id = ANY($2::int[]) and sender_id = $3
                     `,
                     [dialogId, messagesIds, userId]
@@ -226,9 +226,9 @@ class DialogsController {
             if (dialogId && messageId && text) {
                 const updatedMessage = await db.query(
                     `
-                        UPDATE messages
+                        UPDATE dialogs_messages
                         SET text = $4
-                        WHERE messages.dialog_id = $2 and messages.sender_id = $1 and messages.id = $3;
+                        WHERE dialogs_messages.dialog_id = $2 and dialogs_messages.sender_id = $1 and dialogs_messages.id = $3;
                     `,
                     [userId, dialogId, messageId, text]
                 );
@@ -261,10 +261,10 @@ class DialogsController {
             if (dialogId) {
                 const dialog = await db.query(
                     `SELECT 
-                        messages.id as message_id,
-                        messages.text,
-                        messages.date,
-                        messages.sender_id,
+                        dialogs_messages.id as message_id,
+                        dialogs_messages.text,
+                        dialogs_messages.date,
+                        dialogs_messages.sender_id,
                         COALESCE(
                             json_agg(
                                 json_build_object('name', files.name, 'size', files.size, 'type', files.type, 'url', files.url)
@@ -272,18 +272,25 @@ class DialogsController {
                             ) FILTER (WHERE files.id IS NOT NULL),
                             '[]'::json
                         ) as files
-                    FROM messages
-                    LEFT JOIN files ON files.message_id = messages.id
-                    WHERE messages.dialog_id = $1
-                    GROUP BY messages.id, messages.dialog_id, messages.text, messages.date, messages.sender_id
-                    ORDER BY messages.date
+                    FROM dialogs_messages
+                    LEFT JOIN files ON files.message_id = dialogs_messages.id
+                    WHERE dialogs_messages.dialog_id = $1
+                    GROUP BY dialogs_messages.id, dialogs_messages.dialog_id, dialogs_messages.text, dialogs_messages.date, dialogs_messages.sender_id
+                    ORDER BY dialogs_messages.date
+                    `,
+                    [dialogId]
+                );
+
+                const membersInfo = await db.query(
+                    `
+                        SELECT user_id from dialogs_members where dialog_id = $1
                     `,
                     [dialogId]
                 );
 
                 let isMember = false;
-                dialog.rows.map(message => {
-                    if (message.sender_id === userId) {
+                membersInfo.rows.map(row => {
+                    if (row.user_id === userId) {
                         isMember = true;
                     }
                 });
@@ -315,27 +322,27 @@ class DialogsController {
                         )
                     ) AS result
                     FROM (
-                        SELECT DISTINCT ON (messages.dialog_id) 
-                            messages.text, 
-                            messages.date, 
-                            messages.dialog_id, 
-                            messages.sender_id,
+                        SELECT DISTINCT ON (dialogs_messages.dialog_id) 
+                            dialogs_messages.text, 
+                            dialogs_messages.date, 
+                            dialogs_messages.dialog_id, 
+                            dialogs_messages.sender_id,
                             dialogs_members.user_id AS opponent_id,
                             users.name,
                             users.surname,
                             users.avatar
-                        FROM messages
+                        FROM dialogs_messages
                         JOIN dialogs_members 
-                            ON dialogs_members.dialog_id = messages.dialog_id 
+                            ON dialogs_members.dialog_id = dialogs_messages.dialog_id 
                             AND dialogs_members.user_id != $1
                         JOIN users 
                             ON users.id = dialogs_members.user_id
-                        WHERE messages.dialog_id IN (
+                        WHERE dialogs_messages.dialog_id IN (
                             SELECT dialog_id 
                             FROM dialogs_members 
                             WHERE user_id = $1
                         )
-                        ORDER BY messages.dialog_id, messages.date DESC NULLS LAST, messages.id DESC
+                        ORDER BY dialogs_messages.dialog_id, dialogs_messages.date DESC NULLS LAST, dialogs_messages.id DESC
                     ) sub
                     `,
                     [userId]
@@ -399,7 +406,7 @@ class DialogsController {
                 //Удаляем сообщения из бд
                 await client.query(
                     `
-                        DELETE FROM messages
+                        DELETE FROM dialogs_messages
                         WHERE dialog_id = $1
                     `,
                     [dialogId]
