@@ -351,13 +351,103 @@ class DialogsController {
         }
     }
     static async deleteDialog(req: Request, res: Response) {
+        const client = await db.getClient();
+
         try {
-            
+            await client.query('BEGIN');
+
+            const { dialogId } = req.body;
+            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
+            const userId = Number(payload.id);
+
+            if (dialogId && userId) {
+                //Проверяем, является ли пользователь участником удаляемого диалога
+                const memberCheck = await client.query(
+                    'SELECT * FROM dialogs_members WHERE dialog_id = $1 AND user_id = $2 FOR UPDATE',
+                    [dialogId, userId]
+                );
+                if (memberCheck.rowCount === 0) {
+                    await client.query('ROLLBACK');
+                    res.status(403).json({ message: "Вы не являетесь участником этого диалога" });
+                    return
+                }   
+
+                //Удаляем ссылки на файлы статики из бд
+                const deletedFilesResult = await client.query(
+                    `
+                        DELETE FROM files
+                        WHERE message_id IN (SELECT id FROM messages WHERE dialog_id = $1)
+                        RETURNING url
+                    `,
+                    [dialogId]
+                );
+                
+                //Удаляем статику 
+                const deletedFilesUrls = deletedFilesResult.rows.map(row => {
+                    return row.url.replace(process.env.HOST_URL, `./static`);
+                });
+                const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
+
+                if (deleteFilesStatus.status === 500) {
+                    await client.query('ROLLBACK');
+                    res.status(500).json({ 
+                        message: "Ошибка при удалении сообщений. Ошибка при удалении медиа файлов" 
+                    });
+                    return;
+                }
+
+                //Удаляем сообщения из бд
+                await client.query(
+                    `
+                        DELETE FROM messages
+                        WHERE dialog_id = $1
+                    `,
+                    [dialogId]
+                );
+
+                //Удаляем привязку участников к диалогу
+                await client.query(
+                    `
+                        DELETE FROM dialogs_members
+                        WHERE dialog_id = $1
+                    `,
+                    [dialogId]
+                );
+
+                //Удаляем сам диалог
+                const deletedDialogsInfo = await client.query(
+                    `
+                        DELETE FROM dialogs
+                        WHERE id = $1
+                    `,
+                    [dialogId]
+                );
+
+                if (deletedDialogsInfo.rowCount === 0) {
+                    await client.query('ROLLBACK');
+                    res.status(500).json({
+                        message: "Ошибка при удалении диалога. Диалог не найден" 
+                    });
+                    return;
+                }
+
+                await client.query('COMMIT');
+                res.status(200).json({ message: "Диалог успешно удален" });
+                return;
+            }
+            await client.query('ROLLBACK');
+            res.status(400).json({ message: "Ошибка при удалении диалога, диалог не найден" });
+            return;
         }
         catch (error) {
+            await client.query('ROLLBACK');
+
             res.status(500).json({ message: "Ошибка при удалении диалога" });
             console.log(error);
             return;
+        }
+        finally {
+            client.release();
         }
     }
 }
