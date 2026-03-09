@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { IFile } from "./files";
+import { IFile } from "./dialogs-files";
 
 /**
  * Вставляет массив файлов в таблицу files за один запрос.
@@ -19,7 +19,7 @@ export async function insertFiles(client: PoolClient, files: Omit<IFile, 'id'>[]
 
     const result = await client.query<IFile>(
         `
-        INSERT INTO files (name, url, size, type, message_id)
+        INSERT INTO dialogs_files (name, url, size, type, message_id)
             SELECT * FROM UNNEST(
                 $1::text[],
                 $2::text[],

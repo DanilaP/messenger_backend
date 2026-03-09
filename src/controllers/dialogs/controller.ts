@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../../models/db';
 import { IDialogsMessage } from '../../models/dialogs-messages/dialogs-messages';
 import { IDialogs } from '../../models/dialogs/dialogs';
-import { insertFiles } from '../../models/files/model-helpers';
+import { insertFiles } from '../../models/dialogs-files/model-helpers';
 import { insertDialogMembers } from '../../models/dialogs-members/model-helpers';
 import jwt, { JwtPayload } from "jsonwebtoken";
 import moment from 'moment';
@@ -160,7 +160,7 @@ class DialogsController {
                 //Удаляем ссылки на файлы статики из бд
                 const deletedFilesResult = await client.query(
                     `
-                        DELETE FROM files
+                        DELETE FROM dialogs_files
                         WHERE message_id = ANY($1::int[])
                         RETURNING url
                     `,
@@ -267,13 +267,13 @@ class DialogsController {
                         dialogs_messages.sender_id,
                         COALESCE(
                             json_agg(
-                                json_build_object('name', files.name, 'size', files.size, 'type', files.type, 'url', files.url)
-                                ORDER BY files.id
-                            ) FILTER (WHERE files.id IS NOT NULL),
+                                json_build_object('name', dialogs_files.name, 'size', dialogs_files.size, 'type', dialogs_files.type, 'url', dialogs_files.url)
+                                ORDER BY dialogs_files.id
+                            ) FILTER (WHERE dialogs_files.id IS NOT NULL),
                             '[]'::json
                         ) as files
                     FROM dialogs_messages
-                    LEFT JOIN files ON files.message_id = dialogs_messages.id
+                    LEFT JOIN dialogs_files ON dialogs_files.message_id = dialogs_messages.id
                     WHERE dialogs_messages.dialog_id = $1
                     GROUP BY dialogs_messages.id, dialogs_messages.dialog_id, dialogs_messages.text, dialogs_messages.date, dialogs_messages.sender_id
                     ORDER BY dialogs_messages.date
@@ -382,8 +382,8 @@ class DialogsController {
                 //Удаляем ссылки на файлы статики из бд
                 const deletedFilesResult = await client.query(
                     `
-                        DELETE FROM files
-                        WHERE message_id IN (SELECT id FROM messages WHERE dialog_id = $1)
+                        DELETE FROM dialogs_files
+                        WHERE message_id IN (SELECT id FROM dialogs_messages WHERE dialog_id = $1)
                         RETURNING url
                     `,
                     [dialogId]
