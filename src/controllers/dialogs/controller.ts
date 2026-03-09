@@ -167,11 +167,11 @@ class DialogsController {
                     [messagesIds]
                 );
                 
+                //Удаляем статику 
                 const deletedFilesUrls = deletedFilesResult.rows.map(row => {
                     return row.url.replace(process.env.HOST_URL, `./static`);
                 });
                 const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
-                //Удаляем статику 
                 
                 if (deleteFilesStatus.status === 500) {
                     await client.query('ROLLBACK');
@@ -388,7 +388,7 @@ class DialogsController {
                     `,
                     [dialogId]
                 );
-                
+
                 //Удаляем статику 
                 const deletedFilesUrls = deletedFilesResult.rows.map(row => {
                     return row.url.replace(process.env.HOST_URL, `./static`);
