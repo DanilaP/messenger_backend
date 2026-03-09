@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../../models/db';
-import { IMessage } from '../../models/messages/messages';
+import { IDialogsMessage } from '../../models/dialogs-messages/dialogs-messages';
 import { IDialogs } from '../../models/dialogs/dialogs';
 import { insertFiles } from '../../models/files/model-helpers';
 import { insertDialogMembers } from '../../models/dialogs-members/model-helpers';
@@ -97,7 +97,7 @@ class DialogsController {
                 }
                 
                 //Добавляем в бд сообщение
-                const createdMessage = await client.query<IMessage>(
+                const createdMessage = await client.query<IDialogsMessage>(
                     `INSERT INTO dialogs_messages (text, date, dialog_id, sender_id) 
                     VALUES ($1, $2, $3, $4) 
                     RETURNING id, text, date, dialog_id, sender_id`,
