@@ -7,6 +7,7 @@ import { insertDialogMembers } from '../../models/dialogs-members/model-helpers'
 import jwt, { JwtPayload } from "jsonwebtoken";
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
+import { IDialogsMembers } from '../../models/dialogs-members/dialogs-members';
 
 require('dotenv').config();
 
@@ -455,6 +456,48 @@ class DialogsController {
         }
         finally {
             client.release();
+        }
+    }
+    static async getDialogFiles(req: Request, res: Response) {
+        try {
+            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
+            const userId = Number(payload.id);
+            const dialogId = Number(req.query.id);
+
+            if (userId && dialogId) {
+                const memberCheck = await db.query<IDialogsMembers>(
+                    'SELECT * FROM dialogs_members WHERE dialog_id = $1 AND user_id = $2 FOR UPDATE',
+                    [dialogId, userId]
+                );
+                if (memberCheck.rowCount === 0) {
+                    await db.query('ROLLBACK');
+                    res.status(403).json({ message: "Вы не являетесь участником этого диалога" });
+                    return
+                }
+                const dialogFiles = await db.query(
+                    `   
+                        select 
+                            dialogs_messages.id as message_id, 
+                            dialogs_messages.date, 
+                            dialogs_messages.sender_id,
+                            dialogs_files.url,
+                            dialogs_files.type
+                        from dialogs_messages
+                        join dialogs_files on dialogs_messages.id = dialogs_files.message_id 
+                        where dialog_id = $1
+                    `,
+                    [dialogId]
+                );
+                res.status(200).json({ message: "Успешное получение файлов диалога", files: dialogFiles.rows });
+                return;
+            }
+            res.status(400).json({ message: "Ошибка при получении файлов диалога. Диалог не найден" });
+            return;
+        }
+        catch (error) {
+            res.status(500).json({ message: "Ошибка при получении файлов диалога" });
+            console.log(error);
+            return;
         }
     }
 }
