@@ -1,16 +1,17 @@
 import { Request, Response } from "express";
 import { IUser } from "../models/users/users";
 import { db } from "../../db";
-import jwt from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 
 require('dotenv').config();
 
 async function getUserFromToken(req: Request) {
     try {
         const token = req.cookies.token; 
-        const userId = jwt.decode(token);
+        const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+        const userId = payload.id;
         const result = await db.query<IUser>(
-            `SELECT * FROM users WHERE id = $1`,
+            `SELECT id, name, surname, lastname, status, avatar FROM users WHERE id = $1`,
             [userId]
         );
         const user = result.rows[0];

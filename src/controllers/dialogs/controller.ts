@@ -4,10 +4,10 @@ import { IDialogsMessage } from '../../models/dialogs-messages/dialogs-messages'
 import { IDialogs } from '../../models/dialogs/dialogs';
 import { insertFiles } from '../../models/dialogs-files/model-helpers';
 import { insertDialogMembers } from '../../models/dialogs-members/model-helpers';
+import { IDialogsMembers } from '../../models/dialogs-members/dialogs-members';
 import jwt, { JwtPayload } from "jsonwebtoken";
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
-import { IDialogsMembers } from '../../models/dialogs-members/dialogs-members';
 
 require('dotenv').config();
 
