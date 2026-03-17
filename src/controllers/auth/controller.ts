@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { validateEmail } from '../../helpers/validation-helpers';
-import { db } from '../../models/db';
+import { db } from '../../../db';
 import { IUser } from '../../models/users/users';
 import bcrypt from 'bcryptjs';
 import userHelpers from '../../helpers/user-helpers';

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { IUser } from "../models/users/users";
-import { db } from "../models/db";
+import { db } from "../../db";
 import jwt from "jsonwebtoken";
 
 require('dotenv').config();

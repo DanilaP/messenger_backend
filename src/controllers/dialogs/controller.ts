@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { db } from '../../models/db';
+import { db } from '../../../db';
 import { IDialogsMessage } from '../../models/dialogs-messages/dialogs-messages';
 import { IDialogs } from '../../models/dialogs/dialogs';
 import { insertFiles } from '../../models/dialogs-files/model-helpers';

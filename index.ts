@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import AuthMiddleware from './src/middlewares/auth-middleware'; 
 import AuthRouter from './src/controllers/auth/router';
 import DialogsRouter from './src/controllers/dialogs/router';
+import UsersRouter from './src/controllers/users/router';
 
 require('dotenv').config();
 
@@ -29,6 +30,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/auth", AuthRouter);
 app.use("/dialogs", DialogsRouter);
+app.use("/users", UsersRouter);
 
 initWebSocket(server);
 

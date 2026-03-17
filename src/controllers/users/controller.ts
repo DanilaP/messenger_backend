@@ -1,0 +1,32 @@
+import { Request, Response } from 'express';
+import { db } from '../../../db';
+import { IUser } from '../../models/users/users';
+
+class UsersController {
+    static async getUsersList(req: Request, res: Response) {
+        try {
+            const searchString = req.query.searchString;
+            
+            let query = 'SELECT id, name, surname, lastname, status, avatar FROM users';
+            const params: any[] = [];
+
+            if (searchString && typeof searchString === 'string' && searchString.trim() !== '') {
+                const searchPattern = `%${ searchString.trim() }%`;
+                query += ' WHERE name ILIKE $1 OR surname ILIKE $1 OR lastname ILIKE $1';
+                params.push(searchPattern);
+            }
+
+            const usersList = await db.query<Partial<IUser>>(query, params);
+
+            res.status(200).json({ message: "Успешное получение пользователей", users: usersList.rows });
+            return;
+        }
+        catch (error) {
+            res.status(400).json({ message: "Ошибка получения списка пользователей" });
+            console.log(error);
+            return;
+        }
+    }
+}
+
+export default UsersController;
