@@ -24,6 +24,7 @@ class DialogsController {
 
             if ((text || req.files) && (opponentId || dialogId) && opponentId !== userId) {
                 const message = {
+                    message_id: 0,
                     text: text || "",
                     date: moment(Date.now()).format('DD:MM:YYYY HH:mm:ss'),
                     dialog_id: Number(dialogId) || "",
@@ -104,6 +105,8 @@ class DialogsController {
                     RETURNING id, text, date, dialog_id, sender_id`,
                     [text, message.date, Number(message.dialog_id), Number(message.sender_id)]
                 );
+
+                message.message_id = createdMessage.rows[0].id;
 
                 if (createdMessage.rows.length === 0) {
                     await client.query('ROLLBACK');
