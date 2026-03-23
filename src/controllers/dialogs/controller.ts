@@ -222,13 +222,17 @@ class DialogsController {
         }
     }
     static async changeMessage(req: Request, res: Response) {
+        const client = await db.getClient();
+
         try {
+            await client.query('BEGIN');
+
             const { dialogId, messageId, text } = req.body;
             const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
             const userId = Number(payload.id);
 
             if (dialogId && messageId && text) {
-                const updatedMessage = await db.query(
+                const updatedMessage = await client.query(
                     `
                         UPDATE dialogs_messages
                         SET text = $4
@@ -238,11 +242,90 @@ class DialogsController {
                 );
                 
                 if (updatedMessage.rowCount === 0) {
+                    await client.query('ROLLBACK');
                     res.status(500).json({ 
                         message: "Ошибка при изменении сообщения. Ошибка записи данных" 
                     });
                     return;
                 }
+                
+                //Если необходимо удалить предыдущие файлы сообщения
+                if (req.body.deleteMessageFiles) {
+                    //Удаляем ссылки на файлы статики из бд
+                    const deletedFilesResult = await client.query(
+                        `
+                            DELETE FROM dialogs_files
+                            WHERE message_id = $1
+                            RETURNING url
+                        `,
+                        [messageId]
+                    );
+                    
+                    //Удаляем статику 
+                    const deletedFilesUrls = deletedFilesResult.rows.map(row => {
+                        return row.url.replace(process.env.HOST_URL, `./static`);
+                    });
+                    const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
+                    
+                    if (deleteFilesStatus.status === 500) {
+                        await client.query('ROLLBACK');
+                        res.status(500).json({ 
+                            message: "Ошибка при удалении сообщений. Ошибка при удалении предыдущих медиа файлов" 
+                        });
+                        return;
+                    }
+                }
+                //Если необходимо заменить предыдущие файлы сообщения
+                else if (req.files) {
+                    //Удаляем ссылки на файлы статики из бд
+                    const deletedFilesResult = await client.query(
+                        `
+                            DELETE FROM dialogs_files
+                            WHERE message_id = $1
+                            RETURNING url
+                        `,
+                        [messageId]
+                    );
+                    
+                    //Удаляем статику 
+                    const deletedFilesUrls = deletedFilesResult.rows.map(row => {
+                        return row.url.replace(process.env.HOST_URL, `./static`);
+                    });
+                    const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
+                    
+                    if (deleteFilesStatus.status === 500) {
+                        await client.query('ROLLBACK');
+                        res.status(500).json({ 
+                            message: "Ошибка при удалении сообщений. Ошибка при удалении предыдущих медиа файлов" 
+                        });
+                        return;
+                    }
+
+                    //Сохраняем новые файлы в статику
+                    const uploadedFiles = (await fsHelpers.uploadFiles(req.files));
+
+                    if (uploadedFiles.status === 500) {
+                        await client.query('ROLLBACK');
+                        res.status(500).json({ message: "Ошибка при редактировании сообщения. Ошибка при сохранении файлов в статике" });
+                        return;
+                    }
+
+                    const modifiedFiles = uploadedFiles.filelist.map(file => { 
+                        return {
+                            ...file, 
+                            message_id: messageId
+                        }
+                    });
+                    const createdFiles = await insertFiles(client, modifiedFiles);
+                    
+                    if (createdFiles.length === 0) {
+                        await client.query('ROLLBACK');
+                        res.status(500).json({ message: "Ошибка при редактировании сообщения. Ошибка при сохранении файлов в базу" });
+                        return;
+                    }
+                }
+
+                await client.query('COMMIT');
                 res.status(200).json({ message: "Сообщение успешно изменено" });
                 return;
             }
@@ -250,9 +333,14 @@ class DialogsController {
             return;
         }
         catch (error) {
+            await client.query('ROLLBACK');
+
             res.status(500).json({ message: "Ошибка при изменении сообщения" });
             console.log(error);
             return;
+        }
+        finally {
+            client.release();
         }
     }
     static async getUserDialogsInfo(req: Request, res: Response) {
