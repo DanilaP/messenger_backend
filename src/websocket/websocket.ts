@@ -3,7 +3,18 @@ import jwt, { JwtPayload } from "jsonwebtoken";
 import * as ws from 'ws';
 
 let socketserver: ws.Server;
-let clients: { userws: ws, userId: string }[] = [];
+let clients: { userws: ws, userId: number }[] = [];
+
+function getCookie(cookieString: string, name: string): string | null {
+    const cookies = cookieString.split('; ');
+    for (const cookie of cookies) {
+        const [key, value] = cookie.split('=');
+        if (key === name) {
+            return value;
+        }
+    }
+    return null;
+}
 
 export const initWebSocket = (server: any) => {
     socketserver = new ws.Server({ 
@@ -15,14 +26,23 @@ export const initWebSocket = (server: any) => {
     
     socketserver.on('connection', (ws: ws, request: Request) => {
         try {
-            const authToken = request.headers.cookie as string; 
+            const cookieHeader = request.headers.cookie as string;
+            console.log("WS COOKIES", cookieHeader);
+            
+            if (!cookieHeader) {
+                throw new Error('Куки не найдены');
+            }
 
-            if (!authToken) {
+            const token = getCookie(cookieHeader, 'token');
+            if (!token) {
                 throw new Error('Токен не найден в куках');
             }
 
-            const userId = (jwt.decode(authToken) as JwtPayload).id.toString();
+            const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
+            const userId = Number(payload.id);
+
             clients = [...clients, { userws: ws, userId }];
+            console.log(clients);
             console.log(`Пользователь ${userId} подключен`);
 
             ws.on('close', () => {
@@ -41,11 +61,12 @@ export const initWebSocket = (server: any) => {
     });
 };
 
-export const broadcastMessage = (recipientIds: string[], message: any) => {
+export const broadcastMessage = (recipientIds: number[], message: any) => {
+    const modifiedRecipientsIds = recipientIds.map(id => Number(id));
     const messageString = JSON.stringify(message);
-    
+
     clients.forEach(client => {
-        if (recipientIds.includes(client.userId) && client.userws.readyState === ws.OPEN) {
+        if (modifiedRecipientsIds.includes(client.userId) && client.userws.readyState === ws.OPEN) {
             try {
                 client.userws.send(messageString);
             } catch (error) {

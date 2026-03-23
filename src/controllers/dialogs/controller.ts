@@ -5,6 +5,8 @@ import { IDialogs } from '../../models/dialogs/dialogs';
 import { insertFiles } from '../../models/dialogs-files/model-helpers';
 import { insertDialogMembers } from '../../models/dialogs-members/model-helpers';
 import { IDialogsMembers } from '../../models/dialogs-members/dialogs-members';
+import { broadcastMessage } from '../../websocket/websocket';
+import { IFile } from '../../models/dialogs-files/dialogs-files';
 import jwt, { JwtPayload } from "jsonwebtoken";
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
@@ -133,6 +135,18 @@ class DialogsController {
                     message.files = createdFiles;
                 }
                 await client.query('COMMIT');
+
+                const senderInfo = await db.query(
+                    'SELECT id, name, surname, avatar FROM users WHERE id = $1',
+                    [userId]
+                );
+                broadcastMessage([opponentId], {
+                    type: "new_message_dialog",
+                    dialogId: dialogId,
+                    message: message,
+                    senderInfo: senderInfo.rows[0]
+                });
+
                 res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: message });
                 return;
             }
@@ -202,6 +216,20 @@ class DialogsController {
                 }
 
                 await client.query('COMMIT');
+
+                const recepientId = await db.query<{ id: number }>(
+                    `
+                        SELECT id FROM users WHERE id IN 
+	                        (select user_id as id from dialogs_members where dialog_id = $2 and user_id <> $1)
+                    `,
+                    [userId, dialogId]
+                );
+                broadcastMessage([recepientId.rows[0].id], {
+                    type: "delete_message_dialog",
+                    dialogId: dialogId,
+                    deletedMessagesIds: messagesIds
+                });
+
                 res.status(200).json({ message: "Сообщения успешно удалены" });
                 return;
             }
@@ -230,6 +258,12 @@ class DialogsController {
             const { dialogId, messageId, text } = req.body;
             const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
             const userId = Number(payload.id);
+
+            const modifiedMessageInfo: { id: number, text: string, files: Partial<IFile>[] } = {
+                id: messageId,
+                text: text,
+                files: []
+            };
 
             if (dialogId && messageId && text) {
                 const updatedMessage = await client.query(
@@ -267,6 +301,8 @@ class DialogsController {
                     });
                     const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
                     
+                    modifiedMessageInfo.files = [];
+
                     if (deleteFilesStatus.status === 500) {
                         await client.query('ROLLBACK');
                         res.status(500).json({ 
@@ -292,7 +328,7 @@ class DialogsController {
                         return row.url.replace(process.env.HOST_URL, `./static`);
                     });
                     const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
-                    
+
                     if (deleteFilesStatus.status === 500) {
                         await client.query('ROLLBACK');
                         res.status(500).json({ 
@@ -303,6 +339,8 @@ class DialogsController {
 
                     //Сохраняем новые файлы в статику
                     const uploadedFiles = (await fsHelpers.uploadFiles(req.files));
+
+                    modifiedMessageInfo.files = uploadedFiles.filelist;
 
                     if (uploadedFiles.status === 500) {
                         await client.query('ROLLBACK');
@@ -326,6 +364,20 @@ class DialogsController {
                 }
 
                 await client.query('COMMIT');
+
+                const recepientId = await db.query<{ id: number }>(
+                    `
+                        SELECT id FROM users WHERE id IN 
+	                        (select user_id as id from dialogs_members where dialog_id = $2 and user_id <> $1)
+                    `,
+                    [userId, dialogId]
+                );
+                broadcastMessage([recepientId.rows[0].id], {
+                    type: "change_message_dialog",
+                    dialogId: dialogId,
+                    message: modifiedMessageInfo
+                });
+
                 res.status(200).json({ message: "Сообщение успешно изменено" });
                 return;
             }
