@@ -61,7 +61,7 @@ class AuthController {
 
             if (login && password) {
                 const result = await db.query<IUser>(
-                    `SELECT id, login, password, name, surname, lastname, status
+                    `SELECT id, login, password, name, surname, lastname, status, avatar
                     FROM users
                     WHERE login = $1`,
                     [login]
