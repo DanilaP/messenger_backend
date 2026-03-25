@@ -77,7 +77,7 @@ class AuthController {
                     const isPasswordValid = await bcrypt.compare(password, user.password);
 
                     if (!isPasswordValid) {
-                        res.status(401).json({ message: 'Неверный логин или пароль' });
+                        res.status(500).json({ message: 'Неверный логин или пароль' });
                         return;
                     }
 
