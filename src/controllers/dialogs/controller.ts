@@ -378,7 +378,7 @@ class DialogsController {
                     message: modifiedMessageInfo
                 });
 
-                res.status(200).json({ message: "Сообщение успешно изменено" });
+                res.status(200).json({ message: "Сообщение успешно изменено", modifiedMessageInfo });
                 return;
             }
             res.status(400).json({ message: "Ошибка при изменении сообщения. Данные о сообщении не должны быть пустыми" });
