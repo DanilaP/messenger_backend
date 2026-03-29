@@ -454,6 +454,7 @@ class DialogsController {
                         json_build_object(
                             'dialog_id', sub.dialog_id,
                             'last_message', json_build_object(
+                                'id', sub.id,
                                 'text', sub.text,
                                 'date', sub.date
                             ),
@@ -471,6 +472,7 @@ class DialogsController {
                             dialogs_messages.date, 
                             dialogs_messages.dialog_id, 
                             dialogs_messages.sender_id,
+                            dialogs_messages.id,
                             dialogs_members.user_id AS opponent_id,
                             users.name,
                             users.surname,
