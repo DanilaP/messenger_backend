@@ -10,6 +10,7 @@ import { IFile } from '../../models/dialogs-files/dialogs-files';
 import jwt, { JwtPayload } from "jsonwebtoken";
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
+import { checkMember } from '../../models/dialogs/model-helpers';
 
 require('dotenv').config();
 
@@ -426,19 +427,7 @@ class DialogsController {
                     [dialogId]
                 );
 
-                const membersInfo = await db.query(
-                    `
-                        SELECT user_id from dialogs_members where dialog_id = $1
-                    `,
-                    [dialogId]
-                );
-
-                let isMember = false;
-                membersInfo.rows.map(row => {
-                    if (row.user_id === userId) {
-                        isMember = true;
-                    }
-                });
+                const isMember = await checkMember(userId, dialogId);
 
                 if (isMember) {
                     res.status(200).json({ message: "Успешное получение информации о диалоге", dialog: dialog.rows });
@@ -653,19 +642,7 @@ class DialogsController {
             const { dialogId, opponentId } = req.body;
 
             if (dialogId && opponentId) {
-                const membersInfo = await db.query(
-                    `
-                        SELECT user_id from dialogs_members where dialog_id = $1
-                    `,
-                    [dialogId]
-                );
-
-                let isMember = false;
-                membersInfo.rows.map(row => {
-                    if (row.user_id === userId) {
-                        isMember = true;
-                    }
-                });
+                const isMember = await checkMember(userId, dialogId);
 
                 if (isMember) {
                     const updatedMessages = await db.query(
