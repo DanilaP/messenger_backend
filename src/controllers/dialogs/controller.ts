@@ -7,10 +7,10 @@ import { insertDialogMembers } from '../../models/dialogs-members/model-helpers'
 import { IDialogsMembers } from '../../models/dialogs-members/dialogs-members';
 import { broadcastMessage } from '../../websocket/websocket';
 import { IFile } from '../../models/dialogs-files/dialogs-files';
+import { checkMember } from '../../models/dialogs/model-helpers';
 import jwt, { JwtPayload } from "jsonwebtoken";
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
-import { checkMember } from '../../models/dialogs/model-helpers';
 
 require('dotenv').config();
 
