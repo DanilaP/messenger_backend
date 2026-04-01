@@ -406,6 +406,7 @@ class DialogsController {
                 const dialog = await db.query(
                     `SELECT 
                         dialogs_messages.id as message_id,
+                        dialogs_messages.is_read as isRead,
                         dialogs_messages.text,
                         dialogs_messages.date,
                         dialogs_messages.sender_id,
@@ -641,6 +642,61 @@ class DialogsController {
         }
         catch (error) {
             res.status(500).json({ message: "Ошибка при получении файлов диалога" });
+            console.log(error);
+            return;
+        }
+    }
+    static async readMessagesInCertainDialog(req: Request, res: Response) {
+        try {
+            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
+            const userId = Number(payload.id);
+            const { dialogId, opponentId } = req.body;
+
+            if (dialogId && opponentId) {
+                const membersInfo = await db.query(
+                    `
+                        SELECT user_id from dialogs_members where dialog_id = $1
+                    `,
+                    [dialogId]
+                );
+
+                let isMember = false;
+                membersInfo.rows.map(row => {
+                    if (row.user_id === userId) {
+                        isMember = true;
+                    }
+                });
+
+                if (isMember) {
+                    const updatedMessages = await db.query(
+                        ` 
+                            UPDATE dialogs_messages 
+                            SET is_read = true 
+                            WHERE dialog_id = $1 and sender_id = $2 and is_read <> true
+                            RETURNING id as message_id, is_read as isRead
+                        `,
+                        [dialogId, opponentId]
+                    );
+
+                    broadcastMessage([opponentId], {
+                        type: "read_message_dialog",
+                        dialogId: dialogId,
+                        readMessages: updatedMessages
+                    });
+
+                    res.status(200).json({ message: "Сообщения успешно прочитаны", readMessages: updatedMessages.rows });
+                    return;
+                }
+                else {
+                    res.status(403).json({ message: "Ошибка при прочтении сообщений. Вы не являетесь участником данного диалога" });
+                    return;
+                }
+            }
+            res.status(400).json({ message: "Ошибка при прочтении сообщений. Диалог не найден" });
+            return;
+        }
+        catch (error) {
+            res.status(500).json({ message: "Ошибка при прочтении сообщений" });
             console.log(error);
             return;
         }
