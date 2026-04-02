@@ -658,7 +658,7 @@ class DialogsController {
                     broadcastMessage([opponentId], {
                         type: "read_message_dialog",
                         dialogId: dialogId,
-                        readMessages: updatedMessages
+                        readMessages: updatedMessages.rows
                     });
 
                     res.status(200).json({ message: "Сообщения успешно прочитаны", readMessages: updatedMessages.rows });
