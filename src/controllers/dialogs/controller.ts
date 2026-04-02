@@ -407,7 +407,7 @@ class DialogsController {
                 const dialog = await db.query(
                     `SELECT 
                         dialogs_messages.id as message_id,
-                        dialogs_messages.is_read as isRead,
+                        dialogs_messages.is_read as isread,
                         dialogs_messages.text,
                         dialogs_messages.date,
                         dialogs_messages.sender_id,
@@ -421,8 +421,8 @@ class DialogsController {
                     FROM dialogs_messages
                     LEFT JOIN dialogs_files ON dialogs_files.message_id = dialogs_messages.id
                     WHERE dialogs_messages.dialog_id = $1
-                    GROUP BY dialogs_messages.id, dialogs_messages.dialog_id, dialogs_messages.text, dialogs_messages.date, dialogs_messages.sender_id
-                    ORDER BY dialogs_messages.date
+                    GROUP BY dialogs_messages.id, dialogs_messages.dialog_id, dialogs_messages.text, dialogs_messages.date, dialogs_messages.sender_id, dialogs_messages.is_read
+                    ORDER BY TO_TIMESTAMP(dialogs_messages.date, 'DD:MM:YYYY HH24:MI:SS')
                     `,
                     [dialogId]
                 );
