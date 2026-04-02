@@ -32,6 +32,7 @@ class DialogsController {
                     date: moment(Date.now()).format('DD:MM:YYYY HH:mm:ss'),
                     dialog_id: Number(dialogId) || "",
                     sender_id: Number(userId),
+                    isread: false,
                     files: req.files ? (await fsHelpers.uploadFiles(req.files)).filelist : []
                 };
 
@@ -670,7 +671,7 @@ class DialogsController {
                             UPDATE dialogs_messages 
                             SET is_read = true 
                             WHERE dialog_id = $1 and sender_id = $2 and is_read <> true
-                            RETURNING id as message_id, is_read as isRead
+                            RETURNING id as message_id, is_read as isread
                         `,
                         [dialogId, opponentId]
                     );
