@@ -478,7 +478,7 @@ class DialogsController {
                             FROM dialogs_members 
                             WHERE user_id = $1
                         )
-                        ORDER BY dialogs_messages.dialog_id, dialogs_messages.date DESC NULLS LAST, dialogs_messages.id DESC
+                        ORDER BY dialogs_messages.dialog_id, TO_TIMESTAMP(dialogs_messages.date, 'DD:MM:YYYY HH24:MI:SS') DESC NULLS LAST, dialogs_messages.id DESC
                     ) sub
                     `,
                     [userId]
