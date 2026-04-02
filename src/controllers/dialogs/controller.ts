@@ -404,6 +404,19 @@ class DialogsController {
 
             //Получение информации о конкретном диалоге
             if (dialogId) {
+                const opponentInfo = await db.query(
+                    `
+                        SELECT 
+                            user_id as id,
+                            users.name,
+                            users.surname,
+                            users.avatar
+                        FROM dialogs_members
+                        JOIN users on users.id = user_id 
+                        WHERE dialog_id = $1 and user_id <> $2
+                    `,
+                    [dialogId, userId]
+                );
                 const dialog = await db.query(
                     `SELECT 
                         dialogs_messages.id as message_id,
@@ -430,7 +443,14 @@ class DialogsController {
                 const isMember = await checkMember(userId, dialogId);
 
                 if (isMember) {
-                    res.status(200).json({ message: "Успешное получение информации о диалоге", dialog: dialog.rows });
+                    res.status(200).json({ 
+                        message: "Успешное получение информации о диалоге", 
+                        dialog: {
+                            id: dialogId,
+                            messages: dialog.rows,
+                            opponent: opponentInfo.rows[0]
+                        }
+                    });
                     return;
                 }
                 
