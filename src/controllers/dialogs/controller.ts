@@ -144,7 +144,7 @@ class DialogsController {
                 );
                 broadcastMessage([opponentId], {
                     type: "new_message_dialog",
-                    dialogId: dialogId,
+                    dialogId: message.dialog_id,
                     message: message,
                     senderInfo: senderInfo.rows[0]
                 });
