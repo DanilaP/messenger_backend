@@ -22,6 +22,7 @@ class DialogsController {
             await client.query('BEGIN');
 
             const { text, dialogId, opponentId } = req.body;
+            const replayMessageId = req.body.replayMessageId ? Number(req.body.replayMessageId) : null;
             const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
             const userId = payload.id.toString();
 
@@ -33,7 +34,8 @@ class DialogsController {
                     dialog_id: Number(dialogId) || "",
                     sender_id: Number(userId),
                     isread: false,
-                    files: req.files ? (await fsHelpers.uploadFiles(req.files)).filelist : []
+                    files: req.files ? (await fsHelpers.uploadFiles(req.files)).filelist : [],
+                    replayMessageId: replayMessageId
                 };
 
                 //Если dialogId не передали
@@ -104,10 +106,10 @@ class DialogsController {
                 
                 //Добавляем в бд сообщение
                 const createdMessage = await client.query<IDialogsMessage>(
-                    `INSERT INTO dialogs_messages (text, date, dialog_id, sender_id) 
-                    VALUES ($1, $2, $3, $4) 
-                    RETURNING id, text, date, dialog_id, sender_id`,
-                    [text, message.date, Number(message.dialog_id), Number(message.sender_id)]
+                    `INSERT INTO dialogs_messages (text, date, dialog_id, sender_id, replay_message_id) 
+                    VALUES ($1, $2, $3, $4, $5) 
+                    RETURNING id, text, date, dialog_id, sender_id, replay_message_id`,
+                    [text, message.date, Number(message.dialog_id), Number(message.sender_id), replayMessageId]
                 );
 
                 message.message_id = createdMessage.rows[0].id;
@@ -420,25 +422,48 @@ class DialogsController {
                     [dialogId, userId]
                 );
                 const dialog = await db.query(
-                    `SELECT 
-                        dialogs_messages.id as message_id,
-                        dialogs_messages.is_read as isread,
-                        dialogs_messages.text,
-                        dialogs_messages.date,
-                        dialogs_messages.sender_id,
-                        COALESCE(
-                            json_agg(
-                                json_build_object('name', dialogs_files.name, 'size', dialogs_files.size, 'type', dialogs_files.type, 'url', dialogs_files.url)
-                                ORDER BY dialogs_files.id
-                            ) FILTER (WHERE dialogs_files.id IS NOT NULL),
-                            '[]'::json
-                        ) as files
-                    FROM dialogs_messages
-                    LEFT JOIN dialogs_files ON dialogs_files.message_id = dialogs_messages.id
-                    WHERE dialogs_messages.dialog_id = $1
-                    GROUP BY dialogs_messages.id, dialogs_messages.dialog_id, dialogs_messages.text, dialogs_messages.date, dialogs_messages.sender_id, dialogs_messages.is_read
-                    ORDER BY TO_TIMESTAMP(dialogs_messages.date, 'DD:MM:YYYY HH24:MI:SS')
-                    LIMIT $2
+                    `SELECT * FROM (
+                        SELECT 
+                            dialogs_messages.id as message_id,
+                            dialogs_messages.is_read as isread,
+                            dialogs_messages.text,
+                            dialogs_messages.date,
+                            dialogs_messages.sender_id,
+                            COALESCE(
+                                json_agg(
+                                    json_build_object(
+                                        'name', dialogs_files.name, 
+                                        'size', dialogs_files.size, 
+                                        'type', dialogs_files.type, 
+                                        'url', dialogs_files.url
+                                    )
+                                    ORDER BY dialogs_files.id
+                                ) FILTER (WHERE dialogs_files.id IS NOT NULL),
+                                '[]'::json
+                            ) as files,
+                            (
+                                SELECT json_build_object(
+                                    'id', dm.id, 
+                                    'text', dm.text, 
+                                    'senderId', dm.sender_id
+                                )
+                                FROM dialogs_messages dm
+                                WHERE dm.id = dialogs_messages.replay_message_id
+                            ) AS replayMessage
+                        FROM dialogs_messages
+                        LEFT JOIN dialogs_files ON dialogs_files.message_id = dialogs_messages.id
+                        WHERE dialogs_messages.dialog_id = $1
+                        GROUP BY 
+                            dialogs_messages.id, 
+                            dialogs_messages.dialog_id, 
+                            dialogs_messages.text, 
+                            dialogs_messages.date, 
+                            dialogs_messages.sender_id, 
+                            dialogs_messages.is_read
+                        ORDER BY TO_TIMESTAMP(dialogs_messages.date, 'DD:MM:YYYY HH24:MI:SS') DESC
+                        LIMIT $2
+                    ) AS last_page
+                    ORDER BY TO_TIMESTAMP(date, 'DD:MM:YYYY HH24:MI:SS') ASC
                     `,
                     [dialogId, pageNumber]
                 );
