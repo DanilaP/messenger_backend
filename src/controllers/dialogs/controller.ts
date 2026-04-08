@@ -400,11 +400,12 @@ class DialogsController {
     static async getUserDialogsInfo(req: Request, res: Response) {
         try {
             const dialogId = Number(req.query.id);
+            const pageNumber = Number(req.query.page) * 10;
             const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
             const userId = Number(payload.id);
-
+    
             //Получение информации о конкретном диалоге
-            if (dialogId) {
+            if (dialogId && pageNumber) {
                 const opponentInfo = await db.query(
                     `
                         SELECT 
@@ -437,8 +438,9 @@ class DialogsController {
                     WHERE dialogs_messages.dialog_id = $1
                     GROUP BY dialogs_messages.id, dialogs_messages.dialog_id, dialogs_messages.text, dialogs_messages.date, dialogs_messages.sender_id, dialogs_messages.is_read
                     ORDER BY TO_TIMESTAMP(dialogs_messages.date, 'DD:MM:YYYY HH24:MI:SS')
+                    LIMIT $2
                     `,
-                    [dialogId]
+                    [dialogId, pageNumber]
                 );
 
                 const isMember = await checkMember(userId, dialogId);
