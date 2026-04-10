@@ -422,48 +422,43 @@ class DialogsController {
                     [dialogId, userId]
                 );
                 const dialog = await db.query(
-                    `SELECT * FROM (
+                    `WITH full_data AS (
                         SELECT 
-                            dialogs_messages.id as message_id,
-                            dialogs_messages.is_read as isread,
-                            dialogs_messages.text,
-                            dialogs_messages.date,
-                            dialogs_messages.sender_id,
+                            m.id AS message_id,
+                            m.is_read AS isread,
+                            m.text,
+                            m.date,
+                            m.sender_id,
+                            TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
                             COALESCE(
                                 json_agg(
-                                    json_build_object(
-                                        'name', dialogs_files.name, 
-                                        'size', dialogs_files.size, 
-                                        'type', dialogs_files.type, 
-                                        'url', dialogs_files.url
-                                    )
-                                    ORDER BY dialogs_files.id
-                                ) FILTER (WHERE dialogs_files.id IS NOT NULL),
+                                    json_build_object('name', f.name, 'size', f.size, 'type', f.type, 'url', f.url)
+                                    ORDER BY f.id
+                                ) FILTER (WHERE f.id IS NOT NULL),
                                 '[]'::json
-                            ) as files,
-                            (
-                                SELECT json_build_object(
-                                    'id', dm.id, 
-                                    'text', dm.text, 
-                                    'senderId', dm.sender_id
+                            ) AS files,
+                            CASE WHEN m.replay_message_id IS NOT NULL THEN
+                                json_build_object(
+                                    'id', rm.id,
+                                    'text', rm.text,
+                                    'senderId', rm.sender_id
                                 )
-                                FROM dialogs_messages dm
-                                WHERE dm.id = dialogs_messages.replay_message_id
-                            ) AS replayMessage
-                        FROM dialogs_messages
-                        LEFT JOIN dialogs_files ON dialogs_files.message_id = dialogs_messages.id
-                        WHERE dialogs_messages.dialog_id = $1
+                            ELSE NULL END AS replayMessage
+                        FROM dialogs_messages m
+                        LEFT JOIN dialogs_files f ON f.message_id = m.id
+                        LEFT JOIN dialogs_messages rm ON rm.id = m.replay_message_id
+                        WHERE m.dialog_id = $1
                         GROUP BY 
-                            dialogs_messages.id, 
-                            dialogs_messages.dialog_id, 
-                            dialogs_messages.text, 
-                            dialogs_messages.date, 
-                            dialogs_messages.sender_id, 
-                            dialogs_messages.is_read
-                        ORDER BY TO_TIMESTAMP(dialogs_messages.date, 'DD:MM:YYYY HH24:MI:SS') DESC
+                            m.id, m.is_read, m.text, m.date, m.sender_id, m.replay_message_id,
+                            rm.id, rm.text, rm.sender_id
+                    )
+                    SELECT message_id, isread, text, date, sender_id, files, replayMessage
+                    FROM (
+                        SELECT * FROM full_data
+                        ORDER BY ts DESC
                         LIMIT $2
-                    ) AS last_page
-                    ORDER BY TO_TIMESTAMP(date, 'DD:MM:YYYY HH24:MI:SS') ASC
+                    ) last_page
+                    ORDER BY ts ASC
                     `,
                     [dialogId, pageNumber]
                 );
