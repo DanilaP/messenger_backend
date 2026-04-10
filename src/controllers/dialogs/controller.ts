@@ -402,12 +402,12 @@ class DialogsController {
     static async getUserDialogsInfo(req: Request, res: Response) {
         try {
             const dialogId = Number(req.query.id);
-            const pageNumber = Number(req.query.page) * 10;
+            const messageId = req.query.messageId ? Number(req.query.messageId) : null;
             const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
             const userId = Number(payload.id);
     
             //Получение информации о конкретном диалоге
-            if (dialogId && pageNumber) {
+            if (dialogId) {
                 const opponentInfo = await db.query(
                     `
                         SELECT 
@@ -421,8 +421,9 @@ class DialogsController {
                     `,
                     [dialogId, userId]
                 );
-                const dialog = await db.query(
-                    `WITH full_data AS (
+                
+                const baseCTE = `
+                    WITH full_data AS (
                         SELECT 
                             m.id AS message_id,
                             m.is_read AS isread,
@@ -443,7 +444,8 @@ class DialogsController {
                                     'text', rm.text,
                                     'senderId', rm.sender_id
                                 )
-                            ELSE NULL END AS replayMessage
+                            ELSE NULL END AS "replayMessage",
+                            ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
                         FROM dialogs_messages m
                         LEFT JOIN dialogs_files f ON f.message_id = m.id
                         LEFT JOIN dialogs_messages rm ON rm.id = m.replay_message_id
@@ -452,17 +454,38 @@ class DialogsController {
                             m.id, m.is_read, m.text, m.date, m.sender_id, m.replay_message_id,
                             rm.id, rm.text, rm.sender_id
                     )
-                    SELECT message_id, isread, text, date, sender_id, files, replayMessage
-                    FROM (
-                        SELECT * FROM full_data
-                        ORDER BY ts DESC
-                        LIMIT $2
-                    ) last_page
-                    ORDER BY ts ASC
-                    `,
-                    [dialogId, pageNumber]
-                );
+                `;
 
+                let messagesQuery: string;
+                let queryParams: any[];
+
+                if (messageId) {
+                    // Вариант с messageId: получить 10 сообщений ДО указанного + само сообщение
+                    messagesQuery = baseCTE + `
+                        , target_rn AS (
+                            SELECT rn FROM full_data WHERE message_id = $2
+                        )
+                        SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
+                        FROM full_data
+                        WHERE rn BETWEEN (SELECT rn FROM target_rn) - 10 AND (SELECT rn FROM target_rn)
+                        ORDER BY ts ASC, message_id DESC
+                    `;
+                    queryParams = [dialogId, messageId];
+                } else {
+                    // Вариант без messageId: получить последние 10 сообщений диалога
+                    messagesQuery = baseCTE + `
+                        SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
+                        FROM (
+                            SELECT * FROM full_data
+                            ORDER BY ts DESC
+                            LIMIT 10
+                        ) last_page
+                        ORDER BY ts ASC, message_id ASC
+                    `;
+                    queryParams = [dialogId];
+                }
+
+                const dialog = await db.query(messagesQuery, queryParams);
                 const isMember = await checkMember(userId, dialogId);
 
                 if (isMember) {
