@@ -468,7 +468,7 @@ class DialogsController {
                         SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
                         FROM full_data
                         WHERE rn BETWEEN (SELECT rn FROM target_rn) - 10 AND (SELECT rn FROM target_rn) - 1
-                        ORDER BY ts DESC, message_id DESC
+                        ORDER BY ts ASC, message_id DESC
                     `;
                     queryParams = [dialogId, messageId];
                 } else {
@@ -476,7 +476,7 @@ class DialogsController {
                     messagesQuery = baseCTE + `
                         SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
                         FROM full_data
-                        ORDER BY ts DESC
+                        ORDER BY ts ASC
                         LIMIT 10
                     `;
                     queryParams = [dialogId];
