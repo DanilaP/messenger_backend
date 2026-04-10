@@ -460,27 +460,24 @@ class DialogsController {
                 let queryParams: any[];
 
                 if (messageId) {
-                    // Вариант с messageId: получить 10 сообщений ДО указанного + само сообщение
+                    // Вариант с messageId: получить 10 сообщений ДО указанного (без самого сообщения)
                     messagesQuery = baseCTE + `
                         , target_rn AS (
                             SELECT rn FROM full_data WHERE message_id = $2
                         )
                         SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
                         FROM full_data
-                        WHERE rn BETWEEN (SELECT rn FROM target_rn) - 10 AND (SELECT rn FROM target_rn)
-                        ORDER BY ts ASC, message_id DESC
+                        WHERE rn BETWEEN (SELECT rn FROM target_rn) - 10 AND (SELECT rn FROM target_rn) - 1
+                        ORDER BY ts DESC, message_id DESC
                     `;
                     queryParams = [dialogId, messageId];
                 } else {
-                    // Вариант без messageId: получить последние 10 сообщений диалога
+                    // Вариант без messageId: последние 10 сообщений
                     messagesQuery = baseCTE + `
                         SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
-                        FROM (
-                            SELECT * FROM full_data
-                            ORDER BY ts DESC
-                            LIMIT 10
-                        ) last_page
-                        ORDER BY ts ASC, message_id ASC
+                        FROM full_data
+                        ORDER BY ts DESC
+                        LIMIT 10
                     `;
                     queryParams = [dialogId];
                 }
