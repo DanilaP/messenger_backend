@@ -721,6 +721,79 @@ class DialogsController {
             return;
         }
     }
+    static async scrollToMessage(req: Request, res: Response) {
+        try {
+            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
+            const userId = Number(payload.id);
+            const { dialogId, messageId } = req.body;
+
+            if (dialogId && messageId) {
+                const isMember = checkMember(userId, dialogId);
+                if (!isMember) {
+                    res.status(403).json({ 
+                        message: "Ошибка при скролле к сообщению. Вы не являетесь участником данного диалога" 
+                    });
+                    return;
+                }
+                else {
+                    const query = `
+                        WITH full_data AS (
+                            SELECT 
+                                m.id AS message_id,
+                                m.is_read AS isread,
+                                m.text,
+                                m.date,
+                                m.sender_id,
+                                TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
+                                COALESCE(
+                                    json_agg(
+                                        json_build_object('name', f.name, 'size', f.size, 'type', f.type, 'url', f.url)
+                                        ORDER BY f.id
+                                    ) FILTER (WHERE f.id IS NOT NULL),
+                                    '[]'::json
+                                ) AS files,
+                                CASE WHEN m.replay_message_id IS NOT NULL THEN
+                                    json_build_object(
+                                        'id', rm.id,
+                                        'text', rm.text,
+                                        'senderId', rm.sender_id
+                                    )
+                                ELSE NULL END AS "replayMessage",
+                                ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
+                            FROM dialogs_messages m
+                            LEFT JOIN dialogs_files f ON f.message_id = m.id
+                            LEFT JOIN dialogs_messages rm ON rm.id = m.replay_message_id
+                            WHERE m.dialog_id = $1
+                            GROUP BY 
+                                m.id, m.is_read, m.text, m.date, m.sender_id, m.replay_message_id,
+                                rm.id, rm.text, rm.sender_id
+                        ),
+                        target_rn AS (
+                            SELECT rn FROM full_data WHERE message_id = $2
+                        )
+                        SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
+                        FROM full_data
+                        WHERE rn BETWEEN (SELECT rn FROM target_rn) - 11 AND (SELECT rn FROM target_rn) + 11
+                        ORDER BY ts ASC, message_id ASC
+                    `;
+
+                    const result = await db.query(query, [dialogId, messageId]);
+
+                    res.status(200).json({ message: "Сообщения успешно получены", messages: result.rows });
+                    return;
+                }
+            }
+            else {
+                res.status(400).json({ message: "Ошибка при скролле к сообщению. Диалог или сообщение не найдены" });
+                return;
+            }
+        }
+        catch (error) {
+            res.status(500).json({ message: "Ошибка при скролле к сообщению" });
+            console.log(error);
+            return;
+        }
+    }
 }
 
 export default DialogsController;
