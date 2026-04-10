@@ -460,19 +460,19 @@ class DialogsController {
                 let queryParams: any[];
 
                 if (messageId) {
-                    // Вариант с messageId: 10 сообщений ДО + само сообщение, сортировка ASC (старые → новые)
+                    // Только 10 сообщений ДО, без целевого
                     messagesQuery = baseCTE + `
                         , target_rn AS (
                             SELECT rn FROM full_data WHERE message_id = $2
                         )
                         SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
                         FROM full_data
-                        WHERE rn BETWEEN (SELECT rn FROM target_rn) - 10 AND (SELECT rn FROM target_rn)
+                        WHERE rn BETWEEN (SELECT rn FROM target_rn) - 10 AND (SELECT rn FROM target_rn) - 1
                         ORDER BY ts ASC, message_id ASC
                     `;
                     queryParams = [dialogId, messageId];
                 } else {
-                    // Вариант без messageId: последние 10 сообщений, сортировка ASC (старые → новые)
+                    // Последние 10 сообщений
                     messagesQuery = baseCTE + `
                         SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
                         FROM (
@@ -483,9 +483,10 @@ class DialogsController {
                         ORDER BY ts ASC, message_id ASC
                     `;
                     queryParams = [dialogId];
-                };
+                }
 
                 const dialog = await db.query(messagesQuery, queryParams);
+
                 const isMember = await checkMember(userId, dialogId);
 
                 if (isMember) {
