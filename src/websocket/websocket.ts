@@ -27,7 +27,6 @@ export const initWebSocket = (server: any) => {
     socketserver.on('connection', (ws: ws, request: Request) => {
         try {
             const cookieHeader = request.headers.cookie as string;
-            console.log("WS COOKIES", cookieHeader);
             
             if (!cookieHeader) {
                 throw new Error('Куки не найдены');
@@ -42,7 +41,6 @@ export const initWebSocket = (server: any) => {
             const userId = Number(payload.id);
 
             clients = [...clients, { userws: ws, userId }];
-            console.log(clients);
             console.log(`Пользователь ${userId} подключен`);
 
             ws.on('close', () => {

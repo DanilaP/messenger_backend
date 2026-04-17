@@ -35,7 +35,7 @@ class DialogsController {
                     sender_id: Number(userId),
                     isread: false,
                     files: req.files ? (await fsHelpers.uploadFiles(req.files)).filelist : [],
-                    replayMessageId: replayMessageId
+                    replayMessage: null
                 };
 
                 //Если dialogId не передали
@@ -150,6 +150,16 @@ class DialogsController {
                     message: message,
                     senderInfo: senderInfo.rows[0]
                 });
+
+                if (replayMessageId !== null) {
+                    const replayedMessageInfo = await client.query(
+                        `SELECT id, text, sender_id as "senderId" 
+                        FROM dialogs_messages 
+                        WHERE dialog_id = $1 AND id = $2 FOR UPDATE`,
+                        [Number(message.dialog_id), Number(replayMessageId)]
+                    );
+                    message.replayMessage = replayedMessageInfo.rows[0];
+                }
 
                 res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: message });
                 return;
