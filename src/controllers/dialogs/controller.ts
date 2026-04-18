@@ -412,6 +412,7 @@ class DialogsController {
     static async getUserDialogsInfo(req: Request, res: Response) {
         try {
             const dialogId = Number(req.query.id);
+            const mode = req.query.mode;
             const messageId = req.query.messageId ? Number(req.query.messageId) : null;
             const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
             const userId = Number(payload.id);
@@ -470,14 +471,18 @@ class DialogsController {
                 let queryParams: any[];
 
                 if (messageId) {
-                    // Только 10 сообщений ДО, без целевого
+                    // Формируем условие для ROW_NUMBER в зависимости от направления
+                    const rangeCondition = mode === 'next'
+                        ? 'rn BETWEEN (SELECT rn FROM target_rn) + 1 AND (SELECT rn FROM target_rn) + 10'
+                        : 'rn BETWEEN (SELECT rn FROM target_rn) - 10 AND (SELECT rn FROM target_rn) - 1';
+                    
                     messagesQuery = baseCTE + `
                         , target_rn AS (
                             SELECT rn FROM full_data WHERE message_id = $2
                         )
                         SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
                         FROM full_data
-                        WHERE rn BETWEEN (SELECT rn FROM target_rn) - 10 AND (SELECT rn FROM target_rn) - 1
+                        WHERE ${rangeCondition}
                         ORDER BY ts ASC, message_id ASC
                     `;
                     queryParams = [dialogId, messageId];
