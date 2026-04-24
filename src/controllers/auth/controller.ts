@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { validateEmail } from '../../helpers/validation-helpers';
+import { validateEmail, validatePassword } from '../../helpers/validation-helpers';
 import { db } from '../../../db';
 import { IUser } from '../../models/users/users';
 import bcrypt from 'bcryptjs';
@@ -12,7 +12,7 @@ class AuthController {
             const { login, password, name, surname, lastname } = req.body;
             const avatar = `${ process.env.HOST_URL }/files/avatar.jpeg`;
 
-            if (validateEmail(login) && password && name && surname) {
+            if (validateEmail(login) && validatePassword(password) && name && surname) {
                 const saltRounds = 10;
                 const hashedPassword = await bcrypt.hash(password, saltRounds);
 
