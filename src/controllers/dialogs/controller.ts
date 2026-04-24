@@ -22,86 +22,73 @@ class DialogsController {
         try {
             await client.query('BEGIN');
 
-            const { text, dialogId, opponentId } = req.body;
+            const { text, opponentId } = req.body;
             const replayMessageId = req.body.replayMessageId ? Number(req.body.replayMessageId) : null;
             const userId = userHelpers.getUserIdFromToken(req);
 
-            if ((text || req.files) && (opponentId || dialogId) && opponentId !== userId) {
+            if ((text || req.files) && opponentId && opponentId !== userId) {
                 const message = {
                     message_id: 0,
                     text: text || "",
                     date: moment(Date.now()).format('DD:MM:YYYY HH:mm:ss'),
-                    dialog_id: Number(dialogId) || "",
+                    dialog_id: 0,
                     sender_id: Number(userId),
                     isread: false,
                     files: req.files ? (await fsHelpers.uploadFiles(req.files)).filelist : [],
                     replayMessage: null
                 };
 
-                //Если dialogId не передали
-                if (!dialogId) {
-                    //Проверяем что оппоннет существует
-                    const opponentCheck = await client.query<{ id: number }>(
-                        'SELECT id FROM users WHERE id = $1',
-                        [opponentId]
-                    );
-                    if (opponentCheck.rows.length === 0) {
-                        await client.query('ROLLBACK');
-                        res.status(400).json({ message: "Указанный оппонент не существует" });
-                        return
-                    }
+                
+                //Проверяем что оппоннет существует
+                const opponentCheck = await client.query<{ id: number }>(
+                    'SELECT id FROM users WHERE id = $1',
+                    [opponentId]
+                );
 
-                    // Проверяем, существует ли уже диалог между пользователями
-                    const existingDialog = await client.query<{ dialog_id: number }>(
-                        `SELECT dm1.dialog_id
-                        FROM dialogs_members dm1
-                        JOIN dialogs_members dm2 ON dm1.dialog_id = dm2.dialog_id
-                        WHERE dm1.user_id = $1 AND dm2.user_id = $2`,
-                        [userId, opponentId]
-                    );
-
-                    if (existingDialog.rows.length > 0) {
-                        // Диалог уже есть - используем его id
-                        message.dialog_id = existingDialog.rows[0].dialog_id;
-                    } 
-
-                    else {
-                        //Добавляем в бд диалог
-                        const createdDialog = await client.query<IDialogs>(
-                            'INSERT INTO dialogs DEFAULT VALUES RETURNING id'
-                        );
-
-                        if (!createdDialog.rows[0].id) {
-                            await client.query('ROLLBACK');
-                            res.status(500).json({ message: "Ошибка при отправке сообщения. Ошибка при создании диалога" });
-                            return;
-                        }
-
-                        //Добавляем участников диалога в бд
-                        const createdMembers = await insertDialogMembers(client, createdDialog.rows[0].id, [userId, opponentId]);
-
-                        if (createdMembers.length === 0) {
-                            await client.query('ROLLBACK');
-                            res.status(500).json({ 
-                                message: "Ошибка при отправке сообщения. Ошибка при добавлении оппонента в диалог" 
-                            });
-                            return;
-                        }
-
-                        message.dialog_id = createdDialog.rows[0].id;
-                    }
+                if (opponentCheck.rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    res.status(400).json({ message: "Указанный оппонент не существует" });
+                    return
                 }
+
+                // Проверяем, существует ли уже диалог между пользователями
+                const existingDialog = await client.query<{ dialog_id: number }>(
+                    `SELECT dm1.dialog_id
+                    FROM dialogs_members dm1
+                    JOIN dialogs_members dm2 ON dm1.dialog_id = dm2.dialog_id
+                    WHERE dm1.user_id = $1 AND dm2.user_id = $2`,
+                    [userId, opponentId]
+                );
+
+                // Диалог уже есть - используем его id
+                if (existingDialog.rows.length > 0) {
+                    message.dialog_id = existingDialog.rows[0].dialog_id;
+                } 
+                // Если диалога еще нет
                 else {
-                    //Проверяем что пользователь участник диалога
-                    const memberCheck = await client.query(
-                        'SELECT * FROM dialogs_members WHERE dialog_id = $1 AND user_id = $2 FOR UPDATE',
-                        [Number(dialogId), Number(userId)]
+                    //Добавляем в бд диалог
+                    const createdDialog = await client.query<IDialogs>(
+                        'INSERT INTO dialogs DEFAULT VALUES RETURNING id'
                     );
-                    if (memberCheck.rowCount === 0) {
+
+                    if (!createdDialog.rows[0].id) {
                         await client.query('ROLLBACK');
-                        res.status(403).json({ message: "Вы не являетесь участником этого диалога" });
-                        return
+                        res.status(500).json({ message: "Ошибка при отправке сообщения. Ошибка при создании диалога" });
+                        return;
                     }
+
+                    //Добавляем участников диалога в бд
+                    const createdMembers = await insertDialogMembers(client, createdDialog.rows[0].id, [userId, opponentId]);
+
+                    if (createdMembers.length === 0) {
+                        await client.query('ROLLBACK');
+                        res.status(500).json({ 
+                            message: "Ошибка при отправке сообщения. Ошибка при добавлении оппонента в диалог" 
+                        });
+                        return;
+                    }
+
+                    message.dialog_id = createdDialog.rows[0].id;
                 }
                 
                 //Добавляем в бд сообщение
