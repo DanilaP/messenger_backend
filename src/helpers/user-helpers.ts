@@ -41,4 +41,15 @@ function setTokenToTheResponse(res: Response, token: string) {
     });
 }
 
-export default { getUserFromToken, generateAccessToken, setTokenToTheResponse };
+function getUserIdFromToken(req: Request) {
+    const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
+    const userId = payload.id.toString();
+    return userId;
+}
+
+export default { 
+    getUserFromToken, 
+    generateAccessToken, 
+    setTokenToTheResponse,
+    getUserIdFromToken
+};

@@ -11,6 +11,7 @@ import { checkMember } from '../../models/dialogs/model-helpers';
 import jwt, { JwtPayload } from "jsonwebtoken";
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
+import userHelpers from '../../helpers/user-helpers';
 
 require('dotenv').config();
 
@@ -23,8 +24,7 @@ class DialogsController {
 
             const { text, dialogId, opponentId } = req.body;
             const replayMessageId = req.body.replayMessageId ? Number(req.body.replayMessageId) : null;
-            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-            const userId = payload.id.toString();
+            const userId = userHelpers.getUserIdFromToken(req);
 
             if ((text || req.files) && (opponentId || dialogId) && opponentId !== userId) {
                 const message = {
@@ -185,8 +185,7 @@ class DialogsController {
             await client.query('BEGIN');
 
             const { dialogId, messagesIds } = req.body;
-            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-            const userId = Number(payload.id);
+            const userId = userHelpers.getUserIdFromToken(req);
 
             if (userId && dialogId && messagesIds.length > 0) {
                 //Удаляем ссылки на файлы статики из бд
@@ -270,8 +269,7 @@ class DialogsController {
             await client.query('BEGIN');
 
             const { dialogId, messageId, text } = req.body;
-            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-            const userId = Number(payload.id);
+            const userId = userHelpers.getUserIdFromToken(req);
 
             const modifiedMessageInfo: { id: number, text: string, files: Partial<IFile>[] } = {
                 id: messageId,
@@ -414,8 +412,7 @@ class DialogsController {
             const dialogId = Number(req.query.id);
             const mode = req.query.mode;
             const messageId = req.query.messageId ? Number(req.query.messageId) : null;
-            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-            const userId = Number(payload.id);
+            const userId = userHelpers.getUserIdFromToken(req);
     
             //Получение информации о конкретном диалоге
             if (dialogId) {
@@ -582,8 +579,7 @@ class DialogsController {
             await client.query('BEGIN');
 
             const dialogId = Number(req.query.id);
-            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-            const userId = Number(payload.id);
+            const userId = userHelpers.getUserIdFromToken(req);
 
             if (dialogId && userId) {
                 //Проверяем, является ли пользователь участником удаляемого диалога
@@ -677,8 +673,7 @@ class DialogsController {
     }
     static async getDialogFiles(req: Request, res: Response) {
         try {
-            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-            const userId = Number(payload.id);
+            const userId = userHelpers.getUserIdFromToken(req);
             const dialogId = Number(req.query.id);
 
             if (userId && dialogId) {
@@ -719,8 +714,7 @@ class DialogsController {
     }
     static async readMessagesInCertainDialog(req: Request, res: Response) {
         try {
-            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-            const userId = Number(payload.id);
+            const userId = userHelpers.getUserIdFromToken(req);
             const { dialogId, opponentId } = req.body;
 
             if (dialogId && opponentId) {
@@ -762,8 +756,7 @@ class DialogsController {
     }
     static async scrollToMessage(req: Request, res: Response) {
         try {
-            const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-            const userId = Number(payload.id);
+            const userId = userHelpers.getUserIdFromToken(req);
             const { dialogId, messageId } = req.body;
 
             if (dialogId && messageId) {
