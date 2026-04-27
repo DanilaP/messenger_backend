@@ -43,7 +43,7 @@ function setTokenToTheResponse(res: Response, token: string) {
 
 function getUserIdFromToken(req: Request) {
     const payload = jwt.verify(req.cookies?.token, process.env.JWT_SECRET!) as JwtPayload;
-    const userId = payload.id.toString();
+    const userId = payload.id;
     return userId;
 }
 
