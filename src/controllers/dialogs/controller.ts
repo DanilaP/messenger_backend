@@ -8,12 +8,22 @@ import { IDialogsMembers } from '../../models/dialogs-members/dialogs-members';
 import { broadcastMessage } from '../../websocket/websocket';
 import { IFile } from '../../models/dialogs-files/dialogs-files';
 import { checkMember } from '../../models/dialogs/model-helpers';
-import jwt, { JwtPayload } from "jsonwebtoken";
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
 import userHelpers from '../../helpers/user-helpers';
 
 require('dotenv').config();
+
+interface IMessage {
+    message_id: number;
+    text: string;
+    date: string;
+    dialog_id: number;
+    sender_id: number;
+    isread: boolean;
+    files: Omit<IFile, 'id' | 'message_id'>[];
+    replayMessage: number | null;
+}
 
 class DialogsController {
     static async sendMessage(req: Request, res: Response) {
@@ -27,18 +37,17 @@ class DialogsController {
             const userId = userHelpers.getUserIdFromToken(req);
 
             if ((text || req.files) && opponentId && opponentId !== userId) {
-                const message = {
+                const message: IMessage = {
                     message_id: 0,
                     text: text || "",
                     date: moment(Date.now()).format('DD:MM:YYYY HH:mm:ss'),
                     dialog_id: 0,
                     sender_id: Number(userId),
                     isread: false,
-                    files: req.files ? (await fsHelpers.uploadFiles(req.files)).filelist : [],
+                    files: [],
                     replayMessage: null
                 };
 
-                
                 //Проверяем что оппоннет существует
                 const opponentCheck = await client.query<{ id: number }>(
                     'SELECT id FROM users WHERE id = $1',
@@ -91,6 +100,12 @@ class DialogsController {
                     message.dialog_id = createdDialog.rows[0].id;
                 }
                 
+                //Создаем файлы в статике
+                if (req.files) {
+                    message.files = 
+                        req.files ? (await fsHelpers.uploadFiles(req.files, `/dialogs-files/${message.dialog_id}`)).filelist : [];
+                }
+
                 //Добавляем в бд сообщение
                 const createdMessage = await client.query<IDialogsMessage>(
                     `INSERT INTO dialogs_messages (text, date, dialog_id, sender_id, replay_message_id) 
@@ -99,15 +114,7 @@ class DialogsController {
                     [text, message.date, Number(message.dialog_id), Number(message.sender_id), replayMessageId]
                 );
 
-                message.message_id = createdMessage.rows[0].id;
-
-                if (createdMessage.rows.length === 0) {
-                    await client.query('ROLLBACK');
-                    res.status(500).json({ message: "Ошибка при отправке сообщения. Ошибка сохранения сообщения" });
-                    return;
-                }
-
-                //Если файлы переданы - создаем файлы в бд
+                //Создаем файлы в бд
                 if (message.files.length > 0) {
                     const modifiedFiles = message.files.map(file => { 
                         return {
@@ -125,12 +132,22 @@ class DialogsController {
 
                     message.files = createdFiles;
                 }
+
+                message.message_id = createdMessage.rows[0].id;
+
+                if (createdMessage.rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    res.status(500).json({ message: "Ошибка при отправке сообщения. Ошибка сохранения сообщения" });
+                    return;
+                }
+
                 await client.query('COMMIT');
 
                 const senderInfo = await db.query(
                     'SELECT id, name, surname, avatar FROM users WHERE id = $1',
                     [userId]
                 );
+
                 broadcastMessage([opponentId], {
                     type: "new_message_dialog",
                     dialogId: message.dialog_id,
@@ -187,7 +204,7 @@ class DialogsController {
                 
                 //Удаляем статику 
                 const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                    return row.url.replace(process.env.HOST_URL, `./static`);
+                    return row.url.replace(process.env.HOST_URL, `.`);
                 });
                 const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
                 
@@ -296,7 +313,7 @@ class DialogsController {
                     
                     //Удаляем статику 
                     const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                        return row.url.replace(process.env.HOST_URL, `./static`);
+                        return row.url.replace(process.env.HOST_URL, `.`);
                     });
                     const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
                     
@@ -324,7 +341,7 @@ class DialogsController {
                     
                     //Удаляем статику 
                     const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                        return row.url.replace(process.env.HOST_URL, `./static`);
+                        return row.url.replace(process.env.HOST_URL, `.`);
                     });
                     const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
 
@@ -337,7 +354,7 @@ class DialogsController {
                     }
 
                     //Сохраняем новые файлы в статику
-                    const uploadedFiles = (await fsHelpers.uploadFiles(req.files));
+                    const uploadedFiles = (await fsHelpers.uploadFiles(req.files, `/dialogs-files/${dialogId}`));
 
                     modifiedMessageInfo.files = uploadedFiles.filelist;
 
@@ -592,7 +609,7 @@ class DialogsController {
 
                 //Удаляем статику 
                 const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                    return row.url.replace(process.env.HOST_URL, `./static`);
+                    return row.url.replace(process.env.HOST_URL, `.`);
                 });
                 const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
 
