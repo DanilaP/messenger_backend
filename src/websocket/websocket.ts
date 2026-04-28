@@ -41,11 +41,9 @@ export const initWebSocket = (server: any) => {
             const userId = Number(payload.id);
 
             clients = [...clients, { userws: ws, userId }];
-            console.log(`Пользователь ${userId} подключен`);
 
             ws.on('close', () => {
                 clients = clients.filter(client => client.userws !== ws);
-                console.log(`Пользователь ${userId} отключился`);
             });
 
             ws.on('error', (error) => {
