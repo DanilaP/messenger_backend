@@ -1,8 +1,10 @@
 import { initWebSocket } from './src/websocket/websocket';
+import { checkFileAccess } from './src/middlewares/static-middleware';
 import express from 'express';
 import fileUpload from 'express-fileupload';
 import http from 'http';
 import cors from 'cors';
+import path from 'path';
 import cookieParser from 'cookie-parser';
 import AuthMiddleware from './src/middlewares/auth-middleware'; 
 import AuthRouter from './src/controllers/auth/router';
@@ -25,8 +27,21 @@ app.use(AuthMiddleware as express.RequestHandler);
 
 app.use(fileUpload({ createParentPath: true }));
 app.use(express.json());
-app.use(express.static('./static'));
 app.use(express.urlencoded({ extended: true }));
+
+// Публичная статика (без проверки)
+app.use('/files', express.static(path.join(__dirname, 'static/files')));
+
+// Защищённая статика – файлы диалогов
+app.get('/dialogs-files/:dialogId/:filename', checkFileAccess, (req, res) => {
+    const { dialogId, filename } = req.params;
+    const filePath = path.join(__dirname, 'static', 'dialogs-files', dialogId, filename);
+    res.sendFile(filePath, (err) => {
+        if (err) {
+            res.status(404).send('File not found');
+        }
+    });
+});
 
 app.use("/auth", AuthRouter);
 app.use("/dialogs", DialogsRouter);
