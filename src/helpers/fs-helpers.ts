@@ -34,7 +34,7 @@ async function uploadFiles(files: FileArray, baseDirPath: string) {
             const targetPath = path.join(uploadDir, uniqueFileStats);
             await file.mv(targetPath);
 
-            // ✅ Получаем путь относительно папки static (без './static')
+            //Получаем путь относительно папки static (без './static')
             const relativePath = path.relative('./static', targetPath).split(path.sep).join('/');
             const fileUrl = `${process.env.HOST_URL}/${relativePath}`;
 
@@ -64,4 +64,34 @@ async function removeFiles(filesURL: string[]) {
     return { status };
 }
 
-export default { uploadFiles, removeFiles };
+const ALLOWED_IMAGE_MIMES = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/bmp',
+    'image/svg+xml'
+];
+
+//Функция проверки, что все переданные файлы - изображения опр. типа
+export const areAllImages = (files: FileArray) => {
+    if (!files) return true;
+
+    const fileArray = Array.isArray(files.files) ? files.files : [files.files];
+
+    if (fileArray.length === 0) return true;
+
+    // Проверяем каждый файл
+    for (const file of fileArray) {
+        console.log(file.mimetype);
+        // У файла отсутствует mimetype или он не разрешён
+        if (!file.mimetype || !ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+export default { uploadFiles, removeFiles, areAllImages };

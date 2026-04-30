@@ -10,6 +10,7 @@ import AuthMiddleware from './src/middlewares/auth-middleware';
 import AuthRouter from './src/controllers/auth/router';
 import DialogsRouter from './src/controllers/dialogs/router';
 import UsersRouter from './src/controllers/users/router';
+import UserProfileRouter from './src/controllers/user-profile/router';
 
 require('dotenv').config();
 
@@ -46,6 +47,7 @@ app.get('/dialogs-files/:dialogId/:filename', checkFileAccess, (req, res) => {
 app.use("/auth", AuthRouter);
 app.use("/dialogs", DialogsRouter);
 app.use("/users", UsersRouter);
+app.use("/profile", UserProfileRouter);
 
 initWebSocket(server);
 

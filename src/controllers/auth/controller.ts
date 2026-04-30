@@ -10,7 +10,7 @@ class AuthController {
     static async registration(req: Request, res: Response) {
         try {
             const { login, password, name, surname, lastname } = req.body;
-            const avatar = `${ process.env.HOST_URL }/files/avatar.jpeg`;
+            const avatar = `${ process.env.HOST_URL }/files/avatar.jpg`;
 
             if (validateEmail(login) && validatePassword(password) && name && surname) {
                 const saltRounds = 10;
