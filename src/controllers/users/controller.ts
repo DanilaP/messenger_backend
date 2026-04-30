@@ -20,12 +20,12 @@ class UsersController {
         try {
             const searchString = req.query.searchString;
             
-            let query = 'SELECT id, name, surname, lastname, status, avatar FROM users';
+            let query = 'SELECT id, name, surname, lastname, username, status, avatar FROM users';
             const params: any[] = [];
 
             if (searchString && typeof searchString === 'string' && searchString.trim() !== '') {
                 const searchPattern = `%${ searchString.trim() }%`;
-                query += ' WHERE name ILIKE $1 OR surname ILIKE $1 OR lastname ILIKE $1';
+                query += ' WHERE username ILIKE $1';
                 params.push(searchPattern);
             }
 

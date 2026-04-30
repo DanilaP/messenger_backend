@@ -11,7 +11,15 @@ async function getUserFromToken(req: Request) {
         const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
         const userId = payload.id;
         const result = await db.query<IUser>(
-            `SELECT id, name, surname, lastname, status, avatar FROM users WHERE id = $1`,
+            `SELECT 
+                id, 
+                name, 
+                surname, 
+                lastname,
+                username, 
+                status, 
+                avatar 
+            FROM users WHERE id = $1`,
             [userId]
         );
         const user = result.rows[0];
