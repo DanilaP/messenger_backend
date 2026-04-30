@@ -95,7 +95,7 @@ class UserProfileController {
                     await fsHelpers.removeFiles([deletedFileUrl]);
                 }   
 
-                res.status(200).json({ message: "Успешное сохранение аватара пользователя" });
+                res.status(200).json({ message: "Успешное сохранение аватара пользователя", avatar: userAvatarLink });
                 return;
             }
 
