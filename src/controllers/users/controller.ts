@@ -20,7 +20,7 @@ class UsersController {
         try {
             const searchString = req.query.searchString;
             
-            let query = 'SELECT id, name, surname, lastname, username, status, avatar FROM users';
+            let query = 'SELECT id, name, surname, lastname, username, date_of_birth, status, avatar FROM users';
             const params: any[] = [];
 
             if (searchString && typeof searchString === 'string' && searchString.trim() !== '') {

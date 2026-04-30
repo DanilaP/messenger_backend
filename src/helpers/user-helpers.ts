@@ -16,7 +16,8 @@ async function getUserFromToken(req: Request) {
                 name, 
                 surname, 
                 lastname,
-                username, 
+                username,
+                date_of_birth, 
                 status, 
                 avatar 
             FROM users WHERE id = $1`,
