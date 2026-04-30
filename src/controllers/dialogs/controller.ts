@@ -204,7 +204,7 @@ class DialogsController {
                 
                 //Удаляем статику 
                 const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                    return row.url.replace(process.env.HOST_URL, `.`);
+                    return row.url.replace(process.env.HOST_URL, `./static`);
                 });
                 const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
                 
@@ -313,7 +313,7 @@ class DialogsController {
                     
                     //Удаляем статику 
                     const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                        return row.url.replace(process.env.HOST_URL, `.`);
+                        return row.url.replace(process.env.HOST_URL, `./static`);
                     });
                     const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
                     
@@ -341,7 +341,7 @@ class DialogsController {
                     
                     //Удаляем статику 
                     const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                        return row.url.replace(process.env.HOST_URL, `.`);
+                        return row.url.replace(process.env.HOST_URL, `./static`);
                     });
                     const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
 
@@ -609,7 +609,7 @@ class DialogsController {
 
                 //Удаляем статику 
                 const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                    return row.url.replace(process.env.HOST_URL, `.`);
+                    return row.url.replace(process.env.HOST_URL, `./static`);
                 });
                 const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
 
