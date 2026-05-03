@@ -3,6 +3,17 @@ import { db } from '../../../db';
 import userHelpers from '../../helpers/user-helpers';
 import fsHelpers from '../../helpers/fs-helpers';
 
+const updateBasicUserInfo = async (fieldName: string, value: number | string, userId: number) => {
+    await db.query(
+        ` 
+            UPDATE users 
+            SET ${fieldName} = $2 
+            WHERE id = $1
+        `,
+        [userId, value]
+    );
+}
+
 class UserProfileController {
     static async getProfile(req: Request, res: Response) {
         try {
@@ -104,6 +115,36 @@ class UserProfileController {
         }
         catch (error) {
             res.status(500).json({ message: "Ошибка при изменении аватара пользователя" });
+            console.log(error);
+            return;
+        }
+    }
+    static async changeBasicUserInfo(req: Request, res: Response) {
+        try {
+            const userId = userHelpers.getUserIdFromToken(req);
+            const { username, name, surname, dateOfBirth } = req.body;
+
+            if (userId && (username || name || surname || dateOfBirth)) {
+                if (username) {
+                    await updateBasicUserInfo("username", username, userId);
+                }
+                else if (name) {
+                    await updateBasicUserInfo("name", name, userId);
+                }
+                else if (surname) {
+                    await updateBasicUserInfo("surname", surname, userId);
+                }
+                else if (dateOfBirth) {
+                    await updateBasicUserInfo("date_of_birth", dateOfBirth, userId);
+                }
+                res.status(200).json({ message: "Информация о пользователе успешно изменена" });
+                return;
+            }
+            res.status(500).json({ message: "Ошибка смены информации о пользователе. Данные не должны быть пустыми" });
+            return;
+        }
+        catch (error) {
+            res.status(500).json({ message: "Ошибка смены информации о пользователе" });
             console.log(error);
             return;
         }
