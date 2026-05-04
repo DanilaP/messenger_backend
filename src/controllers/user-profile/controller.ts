@@ -102,8 +102,8 @@ class UserProfileController {
 
                 //Удаляем файл предыдущего аватара из статики
                 if (process.env.HOST_URL && user.avatar !== `${ process.env.HOST_URL }/files/avatar.jpg`) {
-                    const deletedFileUrl = user?.avatar.replace(process.env.HOST_URL, `./static`);
-                    await fsHelpers.removeFiles([deletedFileUrl]);
+                    //const deletedFileUrl = user?.avatar.replace(process.env.HOST_URL, `./static`);
+                    await fsHelpers.removeFiles([user?.avatar]);
                 }   
 
                 res.status(200).json({ message: "Успешное сохранение аватара пользователя", avatar: userAvatarLink });

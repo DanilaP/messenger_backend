@@ -36,7 +36,8 @@ async function uploadFiles(files: FileArray, baseDirPath: string) {
 
             //Получаем путь относительно папки static (без './static')
             const relativePath = path.relative('./static', targetPath).split(path.sep).join('/');
-            const fileUrl = `${process.env.HOST_URL}/${relativePath}`;
+            //const fileUrl = `${process.env.HOST_URL}/${relativePath}`;
+            const fileUrl = `/${relativePath}`;
 
             filelist.push({
                 url: fileUrl,
@@ -55,7 +56,8 @@ async function removeFiles(filesURL: string[]) {
     let status = 200;
     for (const url of filesURL) {
         try {
-            await fs.promises.unlink(url);
+            const finalUrl = `./static/${url}`;
+            await fs.promises.unlink(finalUrl);
         } catch (err) {
             console.error(`Не удалось удалить файл ${url}:`, err);
             status = 500;

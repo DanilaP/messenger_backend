@@ -204,7 +204,7 @@ class DialogsController {
                 
                 //Удаляем статику 
                 const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                    return row.url.replace(process.env.HOST_URL, `./static`);
+                    return row.url;
                 });
                 const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
                 
@@ -313,7 +313,7 @@ class DialogsController {
                     
                     //Удаляем статику 
                     const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                        return row.url.replace(process.env.HOST_URL, `./static`);
+                        return row.url;
                     });
                     const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
                     
@@ -341,7 +341,7 @@ class DialogsController {
                     
                     //Удаляем статику 
                     const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                        return row.url.replace(process.env.HOST_URL, `./static`);
+                        return row.url;
                     });
                     const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
 
@@ -506,11 +506,23 @@ class DialogsController {
                 const isMember = await checkMember(userId, dialogId);
 
                 if (isMember) {
+                    //Заменяем url на корректный для всех файлов
+                    const modifiedMessages = dialog.rows.map(message => {
+                        return {
+                            ...message,
+                            files: message.files.map((file: IFile) => {
+                                return {
+                                    ...file,
+                                    url: `${ process.env.HOST_URL }${file.url}`
+                                }
+                            })
+                        }
+                    })
                     res.status(200).json({ 
                         message: "Успешное получение информации о диалоге", 
                         dialog: {
                             id: dialogId,
-                            messages: dialog.rows,
+                            messages: modifiedMessages,
                             opponent: opponentInfo.rows[0]
                         }
                     });
@@ -609,7 +621,7 @@ class DialogsController {
 
                 //Удаляем статику 
                 const deletedFilesUrls = deletedFilesResult.rows.map(row => {
-                    return row.url.replace(process.env.HOST_URL, `./static`);
+                    return row.url;
                 });
                 const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
 

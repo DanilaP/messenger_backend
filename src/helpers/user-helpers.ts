@@ -24,6 +24,7 @@ async function getUserFromToken(req: Request) {
             [userId]
         );
         const user = result.rows[0];
+        user.avatar = `${ process.env.HOST_URL }${user.avatar}`;
         return user;
     } 
     catch (error) {
