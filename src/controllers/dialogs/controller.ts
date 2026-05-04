@@ -523,7 +523,10 @@ class DialogsController {
                         dialog: {
                             id: dialogId,
                             messages: modifiedMessages,
-                            opponent: opponentInfo.rows[0]
+                            opponent: {
+                                ...opponentInfo.rows[0],
+                                avatar: `${ process.env.HOST_URL }${opponentInfo.rows[0].avatar}`
+                            }
                         }
                     });
                     return;
@@ -578,7 +581,16 @@ class DialogsController {
                     `,
                     [userId]
                 );
-                res.status(200).json({ message: "Список диалогов успешно получен", dialogs: dialogs.rows[0].result });
+                const modifiedDialogs = dialogs.rows[0].result.map((dialog: any) => {
+                    return {
+                        ...dialog,
+                        opponent: {
+                            ...dialog.opponent,
+                            avatar: `${ process.env.HOST_URL }${dialog.opponent.avatar}`
+                        }
+                    }
+                })
+                res.status(200).json({ message: "Список диалогов успешно получен", dialogs: modifiedDialogs });
                 return;
             }
         }  

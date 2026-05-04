@@ -36,7 +36,6 @@ async function uploadFiles(files: FileArray, baseDirPath: string) {
 
             //Получаем путь относительно папки static (без './static')
             const relativePath = path.relative('./static', targetPath).split(path.sep).join('/');
-            //const fileUrl = `${process.env.HOST_URL}/${relativePath}`;
             const fileUrl = `/${relativePath}`;
 
             filelist.push({
