@@ -1,5 +1,5 @@
 export interface IDialogsMessage {
-    id: number,
+    id: number, //PK
     text: string,
     date: string,
     is_read: boolean,

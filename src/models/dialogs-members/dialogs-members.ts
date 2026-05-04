@@ -1,5 +1,5 @@
 export interface IDialogsMembers {
-    id: number,
+    id: number, //PK
     dialog_id: number, // FK
     user_id: number // FK
 }

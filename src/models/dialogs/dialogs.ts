@@ -1,3 +1,3 @@
 export interface IDialogs {
-    id: number
+    id: number // PK
 }

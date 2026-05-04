@@ -11,6 +11,7 @@ import AuthRouter from './src/controllers/auth/router';
 import DialogsRouter from './src/controllers/dialogs/router';
 import UsersRouter from './src/controllers/users/router';
 import UserProfileRouter from './src/controllers/user-profile/router';
+import PublicationsRouter from './src/controllers/publications/router';
 
 require('dotenv').config();
 
@@ -32,6 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Публичная статика (без проверки)
 app.use('/files', express.static(path.join(__dirname, 'static/files')));
+app.use('/publications', express.static(path.join(__dirname, 'static/publications')));
 
 // Защищённая статика – файлы диалогов
 app.get('/dialogs-files/:dialogId/:filename', checkFileAccess, (req, res) => {
@@ -48,6 +50,7 @@ app.use("/auth", AuthRouter);
 app.use("/dialogs", DialogsRouter);
 app.use("/users", UsersRouter);
 app.use("/profile", UserProfileRouter);
+app.use("/publications", PublicationsRouter);
 
 initWebSocket(server);
 

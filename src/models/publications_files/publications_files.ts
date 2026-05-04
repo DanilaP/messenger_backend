@@ -1,8 +1,7 @@
-export interface IFile {
+export interface IPublicationFile {
     id: number, //PK
-    name: string,
     url: string,
     size: number,
     type: string,
-    message_id: number //FK
+    publication_id: number //FK
 }
