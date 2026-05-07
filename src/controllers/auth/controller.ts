@@ -28,7 +28,13 @@ class AuthController {
                         const token = userHelpers.generateAccessToken(result.rows[0].id);
                         userHelpers.setTokenToTheResponse(res, token);
 
-                        res.status(200).json({ message: "Успешная регистрация", user: result.rows[0] });
+                        res.status(200).json({ 
+                            message: "Успешная регистрация", 
+                            user: {
+                                ...result.rows[0],
+                                avatar: `${ process.env.HOST_URL }${result.rows[0].avatar}`
+                            } 
+                        });
                         return;
                     }
                 }
@@ -88,7 +94,10 @@ class AuthController {
 
                     res.status(200).json({
                         message: 'Успешный вход',
-                        user: userWithoutPassword
+                        user: {
+                            ...userWithoutPassword,
+                            avatar: `${ process.env.HOST_URL }${userWithoutPassword.avatar}`
+                        }
                     });
                     return;
                 }
