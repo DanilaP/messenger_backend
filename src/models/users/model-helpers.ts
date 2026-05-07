@@ -21,17 +21,14 @@ export const updateBasicUserInfo = async (userId: number, userInfo: IBasicUserIn
     const entriesToUpdate = Object.entries(userInfo).filter(([key, value]) => {
         return allowedFields.includes(key as keyof IBasicUserInfo) && value !== undefined;
     });
-
+    // Нет полей для обновления
     if (entriesToUpdate.length === 0) {
-        // Нет полей для обновления
         return { status: 400, message: "Нет допустимых полей для обновления" };
     }
-
     // 2. Формируем части SQL-запроса динамически
     //    SET "field1" = $2, "field2" = $3, ...
     const setClauses = entriesToUpdate.map((_, idx) => `"${entriesToUpdate[idx][0]}" = $${idx + 2}`);
     const setString = setClauses.join(", ");
-
     // 3. Значения для параметров: сначала userId ($1), затем значения полей в том же порядке
     const values = [userId, ...entriesToUpdate.map(([, value]) => value)];
 
