@@ -65,6 +65,7 @@ class PublicationsController {
                 );
                 if (createdPublicationInfo.rows.length === 0) {
                     await client.query('ROLLBACK');
+                    await fsHelpers.removeFiles([publicationInfo.file.url]);
                     res.status(500).json({ 
                         message: "Ошибка при создании публикации. Неудачное сохранение публикации" 
                     });
@@ -84,6 +85,7 @@ class PublicationsController {
 
                 if (publicationFileInfo.rows.length === 0) {
                     await client.query('ROLLBACK');
+                    await fsHelpers.removeFiles([publicationInfo.file.url]);
                     res.status(500).json({ 
                         message: "Ошибка при создании публикации. Неудачное сохранение информации о файле" 
                     });
@@ -106,7 +108,7 @@ class PublicationsController {
         }
         catch (error) {
             await client.query('ROLLBACK');
-
+            
             res.status(500).json({ message: "Ошибка при создании публикации" });
             console.log(error);
             return;
@@ -193,7 +195,7 @@ class PublicationsController {
                 }
             }
 
-            if (publicationId || text || req.files) {
+            if (publicationId && (text || req.files)) {
                 //Обновляем базову информацию про публикацию
                 const updatePublicationResponse = await changeBasicPublicationInfo(userId, publicationId, { text, archived });
                 let updatedPublicationFileUrl: string | null = null;
@@ -220,20 +222,39 @@ class PublicationsController {
                     );
                     //Сохраняем обновленный файл
                     const uploadedFileInfo = (await fsHelpers.uploadFiles(req.files, "/publications"));
-                    //Удаляем прежний файл
+
                     if (uploadedFileInfo.status === 200) {
-                        await fsHelpers.removeFiles([currentPublicationFileInfo.rows[0].file.url]);
+                        //Удаляем прежний файл
+                        const deletedFileInfo = await fsHelpers.removeFiles([currentPublicationFileInfo.rows[0].file.url]);
+
+                        //Проверяем, что файл действительно удален
+                        if (deletedFileInfo.status === 200) {
+                            //Обновляем ссылку на файл в бд
+                            await db.query(
+                                `
+                                    UPDATE publications_files
+                                    SET url = $2
+                                    WHERE publications_files.publication_id = $1
+                                `,
+                                [publicationId, uploadedFileInfo.filelist[0].url]
+                            );
+                            updatedPublicationFileUrl = `${ process.env.HOST_URL }${uploadedFileInfo.filelist[0].url}`;
+                        }
+                        else {
+                            //Удаляем загруженный файл
+                            await fsHelpers.removeFiles([uploadedFileInfo.filelist[0].url]);
+                            res.status(400).json({ 
+                                message: "Ошибка при изменении публикации. Ошибка при работе с файлом"
+                            });
+                            return;
+                        }
                     }
-                    //Обновляем ссылку на файл в бд
-                    await db.query(
-                        `
-                            UPDATE publications_files
-                            SET url = $2
-                            WHERE publications_files.publication_id = $1
-                        `,
-                        [publicationId, uploadedFileInfo.filelist[0].url]
-                    );
-                    updatedPublicationFileUrl = `${ process.env.HOST_URL }${uploadedFileInfo.filelist[0].url}`;
+                    else {
+                        res.status(400).json({ 
+                            message: "Ошибка при изменении публикации. Ошибка при сохранении файла"
+                        });
+                        return;
+                    }
                 }
 
                 const responseObject: { message: string, updatedFileUrl?: string } = {
@@ -246,6 +267,8 @@ class PublicationsController {
                 res.status(updatePublicationResponse.status).json(responseObject);
                 return;
             }
+            res.status(400).json({ message: "Ошибка при изменении публикации. Данные не должны быть пустыми" });
+            return;
         }
         catch (error) {
             res.status(500).json({ message: "Ошибка при изменении публикации" });
