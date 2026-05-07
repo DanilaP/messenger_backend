@@ -1,15 +1,32 @@
 import { Request, Response } from 'express';
 import { db } from '../../../db';
-import { IPublication } from '../../models/publications/publications';
 import userHelpers from '../../helpers/user-helpers';
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
-import { IPublicationFile } from '../../models/publications_files/publications_files';
 
 class PublicationsController {
     static async getPublications(req: Request, res: Response) {
         try {
-            
+            const userId = Number(req.query.userId);
+            const userPublications = await db.query(
+                `
+                    select 
+                        publications.id,
+                        user_id as "userId", 
+                        text,
+                        date,
+                        json_build_object('url', url, 'size', size, 'type', type) as file
+                    from publications
+                    join publications_files on publications_files.publication_id = publications.id 
+                    where user_id = $1    
+                `,
+                [userId]
+            );
+            res.status(200).json({ 
+                message: "Успешное получение публикаций пользователя",
+                publicaions: userPublications.rows
+            });
+            return;
         }
         catch (error) {
             res.status(500).json({ message: "Ошибка при получении публикаций" });
@@ -34,7 +51,7 @@ class PublicationsController {
                 const publicationInfo = {
                     file: (await fsHelpers.uploadFiles(req.files, "/publications")).filelist[0]
                 }
-                const createdPublicationInfo = await db.query<IPublicationFile>(
+                const createdPublicationInfo = await db.query(
                     `INSERT INTO publications (user_id, text, date) 
                     VALUES ($1, $2, $3) 
                     RETURNING id, user_id as "userId", text, date`,
@@ -51,7 +68,7 @@ class PublicationsController {
                     });
                     return;
                 }
-                const publicationFileInfo = await db.query<IPublicationFile>(
+                const publicationFileInfo = await db.query(
                     `INSERT INTO publications_files (url, size, type, publication_id) 
                     VALUES ($1, $2, $3, $4) 
                     RETURNING id, url, size, type`,
