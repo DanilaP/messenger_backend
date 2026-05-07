@@ -3,16 +3,56 @@ import { db } from '../../../db';
 import userHelpers from '../../helpers/user-helpers';
 import fsHelpers from '../../helpers/fs-helpers';
 
-const updateBasicUserInfo = async (fieldName: string, value: number | string, userId: number) => {
-    await db.query(
-        ` 
-            UPDATE users 
-            SET ${fieldName} = $2 
-            WHERE id = $1
-        `,
-        [userId, value]
-    );
+interface IBasicUserInfo {
+    username?: string,
+    name?: string,
+    surname?: string,
+    date_of_birth?: string,
+    status?: string,
+    avatar?: string
 }
+
+const updateBasicUserInfo = async (userId: number, userInfo: IBasicUserInfo) => {
+    // Разрешенные поля (они же ключи интерфейса)
+    const allowedFields: (keyof IBasicUserInfo)[] = [
+        "username", "name", "surname", "date_of_birth", "status", "avatar"
+    ];
+    // 1. Отфильтруем только те поля, которые:
+    //    - есть в переданном объекте,
+    //    - не undefined,
+    //    - разрешены.
+    const entriesToUpdate = Object.entries(userInfo).filter(([key, value]) => {
+        return allowedFields.includes(key as keyof IBasicUserInfo) && value !== undefined;
+    });
+
+    if (entriesToUpdate.length === 0) {
+        // Нет полей для обновления
+        return { status: 400, message: "Нет допустимых полей для обновления" };
+    }
+
+    // 2. Формируем части SQL-запроса динамически
+    //    SET "field1" = $2, "field2" = $3, ...
+    const setClauses = entriesToUpdate.map((_, idx) => `"${entriesToUpdate[idx][0]}" = $${idx + 2}`);
+    const setString = setClauses.join(", ");
+
+    // 3. Значения для параметров: сначала userId ($1), затем значения полей в том же порядке
+    const values = [userId, ...entriesToUpdate.map(([, value]) => value)];
+
+    try {
+        await db.query(
+            `
+                UPDATE users
+                SET ${setString}
+                WHERE id = $1
+            `,
+            values
+        );
+        return { status: 200, message: "Данные успешно обновлены" };
+    } catch (error) {
+        console.error("Ошибка обновления пользователя:", error);
+        return { status: 500, message: "Ошибка сохранения данных пользователя" };
+    }
+};
 
 class UserProfileController {
     static async getProfile(req: Request, res: Response) {
@@ -121,25 +161,8 @@ class UserProfileController {
     static async changeBasicUserInfo(req: Request, res: Response) {
         try {
             const userId = userHelpers.getUserIdFromToken(req);
-            const { username, name, surname, dateOfBirth } = req.body;
-
-            if (userId && (username || name || surname || dateOfBirth)) {
-                if (username) {
-                    await updateBasicUserInfo("username", username, userId);
-                }
-                else if (name) {
-                    await updateBasicUserInfo("name", name, userId);
-                }
-                else if (surname) {
-                    await updateBasicUserInfo("surname", surname, userId);
-                }
-                else if (dateOfBirth) {
-                    await updateBasicUserInfo("date_of_birth", dateOfBirth, userId);
-                }
-                res.status(200).json({ message: "Информация о пользователе успешно изменена" });
-                return;
-            }
-            res.status(500).json({ message: "Ошибка смены информации о пользователе. Данные не должны быть пустыми" });
+            const updateUserDataResponse = await updateBasicUserInfo(userId, { ...req.body });
+            res.status(updateUserDataResponse.status).json({ message: updateUserDataResponse.message });
             return;
         }
         catch (error) {
