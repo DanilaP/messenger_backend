@@ -1,11 +1,10 @@
-import { db } from "../../../db";
-
 interface IBasicPublicationInfo {
     text?: string,
     archived?: boolean
 }
 
 export const changeBasicPublicationInfo = async (
+    client: any,
     userId: number, 
     publicationId: number, 
     publicationInfo: IBasicPublicationInfo
@@ -31,7 +30,7 @@ export const changeBasicPublicationInfo = async (
     const values = [userId, publicationId, ...entriesToUpdate.map(([, value]) => value)];
 
     try {
-        await db.query(
+        await client.query(
             `
                 UPDATE publications
                 SET ${setString}

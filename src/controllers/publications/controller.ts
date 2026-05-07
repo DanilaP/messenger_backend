@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { db } from '../../../db';
 import { changeBasicPublicationInfo } from '../../models/publications/model-helpers';
+import { parseStringToBoolean } from '../../helpers/parsers';
 import userHelpers from '../../helpers/user-helpers';
 import moment from 'moment';
 import fsHelpers from '../../helpers/fs-helpers';
@@ -39,6 +40,7 @@ class PublicationsController {
         const client = await db.getClient();
 
         try {
+            await client.query('BEGIN');
             const userId = userHelpers.getUserIdFromToken(req);
             const { text } = req.body;
 
@@ -121,6 +123,7 @@ class PublicationsController {
         const client = await db.getClient();
 
         try {
+            await client.query('BEGIN');
             const publicationId = Number(req.query.id);
 
             if (publicationId) {
@@ -180,14 +183,17 @@ class PublicationsController {
         }
     }
     static async changePublication(req: Request, res: Response) {
+        const client = await db.getClient();
+
         try {
+            await client.query('BEGIN');
             const userId = userHelpers.getUserIdFromToken(req);
             const { publicationId, text } = req.body;
             let archived = undefined;
 
             if (req.body.archived) {
                 if (req.body.archived === "true" || req.body.archived === "false") {
-                    archived = req.body.archived;
+                    archived = parseStringToBoolean(req.body.archived);
                 }
                 else {
                     res.status(400).json({ message: "Ошибка при изменении публикации. Передан некорректный тип данных" });
@@ -197,7 +203,8 @@ class PublicationsController {
 
             if (publicationId && (text || req.files)) {
                 //Обновляем базову информацию про публикацию
-                const updatePublicationResponse = await changeBasicPublicationInfo(userId, publicationId, { text, archived });
+                const updatePublicationResponse = 
+                    await changeBasicPublicationInfo(client, userId, publicationId, { text, archived });
                 let updatedPublicationFileUrl: string | null = null;
 
                 //Если передали обновленный файл
@@ -210,7 +217,7 @@ class PublicationsController {
                         return;
                     }
                     //Получаем текущую информацию об изменяемой публикации
-                    const currentPublicationFileInfo = await db.query(
+                    const currentPublicationFileInfo = await client.query(
                         `
                             select 
                                 json_build_object('url', url, 'size', size, 'type', type) as file
@@ -230,7 +237,7 @@ class PublicationsController {
                         //Проверяем, что файл действительно удален
                         if (deletedFileInfo.status === 200) {
                             //Обновляем ссылку на файл в бд
-                            await db.query(
+                            await client.query(
                                 `
                                     UPDATE publications_files
                                     SET url = $2
@@ -241,6 +248,7 @@ class PublicationsController {
                             updatedPublicationFileUrl = `${ process.env.HOST_URL }${uploadedFileInfo.filelist[0].url}`;
                         }
                         else {
+                            await client.query('ROLLBACK');
                             //Удаляем загруженный файл
                             await fsHelpers.removeFiles([uploadedFileInfo.filelist[0].url]);
                             res.status(400).json({ 
@@ -250,6 +258,7 @@ class PublicationsController {
                         }
                     }
                     else {
+                        await client.query('ROLLBACK');
                         res.status(400).json({ 
                             message: "Ошибка при изменении публикации. Ошибка при сохранении файла"
                         });
@@ -264,6 +273,7 @@ class PublicationsController {
                 if (updatedPublicationFileUrl) {
                     responseObject.updatedFileUrl = updatedPublicationFileUrl
                 }
+                await client.query('COMMIT');
                 res.status(updatePublicationResponse.status).json(responseObject);
                 return;
             }
@@ -271,9 +281,13 @@ class PublicationsController {
             return;
         }
         catch (error) {
+            await client.query('ROLLBACK');
             res.status(500).json({ message: "Ошибка при изменении публикации" });
             console.log(error);
             return;
+        }
+        finally {
+            client.release();
         }
     }
 }
