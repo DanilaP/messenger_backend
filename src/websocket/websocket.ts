@@ -1,9 +1,27 @@
 import { Request } from 'express';
 import jwt, { JwtPayload } from "jsonwebtoken";
+import cron from 'node-cron';
 import * as ws from 'ws';
 
 let socketserver: ws.Server;
 let clients: { userws: ws, userId: number }[] = [];
+
+const broadcastConnectedClients = () => {
+    const connectedUserIds = clients.map(client => client.userId);
+    const message = JSON.stringify({
+        type: 'connected_clients',
+        clientIds: connectedUserIds
+    });
+    clients.forEach(client => {
+        if (client.userws.readyState === ws.OPEN) {
+            try {
+                client.userws.send(message);
+            } catch (error) {
+                console.error(`Ошибка отправки списка клиентов пользователю ${client.userId}:`, error);
+            }
+        }
+    });
+};
 
 function getCookie(cookieString: string, name: string): string | null {
     const cookies = cookieString.split('; ');
@@ -54,6 +72,10 @@ export const initWebSocket = (server: any) => {
             console.error("Ошибка при подключении WebSocket:", error);
             ws.close(1008, 'Не авторизован');
         }
+    });
+
+    cron.schedule('*/5 * * * *', () => {
+        broadcastConnectedClients();
     });
 };
 

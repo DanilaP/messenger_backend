@@ -204,7 +204,7 @@ class PublicationsController {
             if (publicationId && (text || req.files)) {
                 //Обновляем базову информацию про публикацию
                 const updatePublicationResponse = 
-                    await changeBasicPublicationInfo(client, userId, publicationId, { text, archived });
+                    await changeBasicPublicationInfo(client, userId, publicationId, { ...req.body, archived });
                 let updatedPublicationFileUrl: string | null = null;
 
                 //Если передали обновленный файл
