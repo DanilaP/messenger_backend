@@ -2,8 +2,8 @@ import { Request, Response } from "express";
 import { IUser } from "../models/users/users";
 import { db } from "../../db";
 import jwt, { JwtPayload } from "jsonwebtoken";
-
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 
 async function getUserFromToken(req: Request) {
 	try {

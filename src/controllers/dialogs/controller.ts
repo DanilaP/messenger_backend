@@ -11,8 +11,8 @@ import { checkMember } from "../../models/dialogs/model-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
-
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 
 interface IMessage {
     message_id: number;

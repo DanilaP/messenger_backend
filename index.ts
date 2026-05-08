@@ -12,8 +12,8 @@ import DialogsRouter from "./src/controllers/dialogs/router";
 import UsersRouter from "./src/controllers/users/router";
 import UserProfileRouter from "./src/controllers/user-profile/router";
 import PublicationsRouter from "./src/controllers/publications/router";
-
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 
 const PORT = process.env.PORT;
 const app = express();

@@ -4,7 +4,8 @@ import { db } from "../../../db";
 import { IUser } from "../../models/users/users";
 import bcrypt from "bcryptjs";
 import userHelpers from "../../helpers/user-helpers";
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 
 class AuthController {
 	static async registration(req: Request, res: Response) {

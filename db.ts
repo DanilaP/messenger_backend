@@ -1,5 +1,6 @@
 import { Pool, QueryResult, QueryResultRow } from "pg";
-require("dotenv").config();
+import dotenv from "dotenv";
+dotenv.config();
 
 const connectionString = process.env.DB_URL as string;
 
