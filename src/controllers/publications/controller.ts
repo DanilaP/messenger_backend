@@ -26,7 +26,15 @@ class PublicationsController {
 			);
 			res.status(200).json({ 
 				message: "Успешное получение публикаций пользователя",
-				publicaions: userPublications.rows
+				publications: userPublications.rows.map(publication => {
+					return {
+						...publication,
+						file: {
+							...publication.file,
+							url: `${ process.env.HOST_URL }${publication.file}`
+						}
+					};
+				})
 			});
 			return;
 		}
