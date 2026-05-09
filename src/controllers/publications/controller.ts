@@ -59,7 +59,7 @@ class PublicationsController {
 				});
 				return;
 			}
-			else if (req.files) {
+			else if (req.files && fsHelpers.areAllImages(req.files)) {
 				const publicationInfo = {
 					file: (await fsHelpers.uploadFiles(req.files, "/publications")).filelist[0]
 				};
