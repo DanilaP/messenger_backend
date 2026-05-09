@@ -12,16 +12,17 @@ class PublicationsController {
 			const userId = Number(req.query.userId);
 			const userPublications = await db.query(
 				`
-                    select 
-                        publications.id,
-                        user_id as "userId", 
-                        text,
-                        date,
-                        json_build_object('url', url, 'size', size, 'type', type) as file
-                    from publications
-                    join publications_files on publications_files.publication_id = publications.id 
-                    where user_id = $1    
-                `,
+					select 
+						publications.id,
+						user_id as "userId", 
+						to_char(date, 'DD.MM.YYYY') as date,
+						text,
+						archived,
+						json_build_object('url', url, 'size', size, 'type', type) as file
+					from publications
+					join publications_files on publications_files.publication_id = publications.id 
+					where user_id = $1    
+					`,
 				[userId]
 			);
 			res.status(200).json({ 
@@ -31,7 +32,7 @@ class PublicationsController {
 						...publication,
 						file: {
 							...publication.file,
-							url: `${ process.env.HOST_URL }${publication.file}`
+							url: `${ process.env.HOST_URL }${publication.file.url}`
 						}
 					};
 				})
