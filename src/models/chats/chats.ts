@@ -1,5 +1,5 @@
 export interface IChat {
-    id: number,
+    id: number, //PK
     image: string,
     name: string,
     description: string,
