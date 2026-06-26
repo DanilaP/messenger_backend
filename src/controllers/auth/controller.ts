@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { validateEmail, validatePassword } from "../../helpers/validation-helpers";
+import { validateEmail, validateOnlyLetterStringValue, validatePassword } from "../../helpers/validation-helpers";
 import { db } from "../../../db";
 import { IUser } from "../../models/users/users";
 import bcrypt from "bcryptjs";
@@ -13,7 +13,12 @@ class AuthController {
 			const { login, password, name, surname, lastname } = req.body;
 			const avatar = `/files/avatar.jpg`;
 
-			if (validateEmail(login) && validatePassword(password) && name && surname) {
+			if (
+				validateEmail(login) && 
+				validatePassword(password) && 
+				validateOnlyLetterStringValue(name) && 
+				validateOnlyLetterStringValue(surname)
+			) {
 				const saltRounds = 10;
 				const hashedPassword = await bcrypt.hash(password, saltRounds);
 
@@ -66,7 +71,7 @@ class AuthController {
 		try {
 			const { login, password } = req.body;
 
-			if (login && password) {
+			if (validateEmail(login) && validatePassword(password)) {
 				const result = await db.query<IUser>(
 					`SELECT id, login, password, name, surname, lastname, status, avatar
                     FROM users
@@ -103,7 +108,7 @@ class AuthController {
 					return;
 				}
 			}
-			res.status(400).json({ message: "Логин и пароль не должны быть пустыми" });
+			res.status(400).json({ message: "Логин и пароль не должны быть пустыми и должны соответствовать правильной структуре" });
 			return;
 		}
 		catch (error) {

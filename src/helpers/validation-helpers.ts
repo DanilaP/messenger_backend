@@ -6,3 +6,8 @@ export function validateEmail(str: string): boolean {
 export function validatePassword(str: string): boolean {
 	return (str.length >= 6);
 }
+
+export function validateOnlyLetterStringValue(str: string): boolean {
+	const regex = /^\p{L}+$/u;
+  	return regex.test(str);
+}
