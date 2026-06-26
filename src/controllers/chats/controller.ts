@@ -57,7 +57,7 @@ class ChatController {
 			}
 
 			const chat = insertResult.rows[0];
-			let finalImagePath = "";
+			let finalImagePath = defaultImage;
 
 			//Если передали файл - сохраняем его в статику
 			if (req.files) {
