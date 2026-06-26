@@ -1,6 +1,9 @@
 import { Request, Response } from "express";
 import { db } from "../../../db";
 import { validateOnlyLettersAndNumbersStringValue } from "../../helpers/validation-helpers";
+import { ensureUserExists } from "../../models/users/model-helpers";
+import { IChatInvitation } from "../../models/chats_invitations/chats_invitations";
+import { checkChatMember, ensureChatExists } from "../../models/chats/model-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
@@ -108,6 +111,73 @@ class ChatController {
 		finally {
 			client.release();
 		}
+	}
+	static async sendInvitationToChat(req: Request, res: Response) {
+		try {
+			const { userId, chatId } = req.body;
+
+			//Проверяем, что пользователь и чат существуют и, что данный пользователь - не участник чата
+			const [userExists, chatExists, chatMemberExists] = await Promise.all([
+				ensureUserExists(userId),
+				ensureChatExists(chatId),
+				checkChatMember(chatId, userId)
+			]);
+
+			if (userExists && chatExists && (chatMemberExists === false)) {
+				const result = await db.query<IChatInvitation>(
+					`
+						INSERT INTO chats_invitations (chat_id, user_id) 
+						VALUES ($1, $2) 
+						RETURNING id, chat_id, user_id
+					`,
+					[chatId, userId]
+				);
+
+				res.status(200).json({ 
+					message: "Успешное создание приглашения",
+					invitation: result.rows[0] 
+				});
+				return;
+			}
+
+			res.status(400).json({ message: "Некорректные данные приглашения" });
+			return;
+		} 
+		catch (error) {
+			console.error("Ошибка при отправке приглашения в чат", error);
+			res.status(500).json({ message: "Ошибка при отправке приглашения в чат" });
+			return;
+		} 
+	}
+	static async declineInvitationToChat(req: Request, res: Response) {
+		try {
+			const userId = userHelpers.getUserIdFromToken(req);
+			const invitationId = req.body.invitationId;
+
+			if (userId && invitationId) {
+				const deletedFilesResult = await db.query<IChatInvitation>(
+					`
+						DELETE FROM chats_invitations
+						WHERE id = $1 and user_id = $2
+						RETURNING id, chat_id, user_id
+					`,
+					[invitationId, userId]
+				);
+
+				if (deletedFilesResult.rowCount !== 0) {
+					res.status(200).json({ message: "Успешное отклонение приглашения в чат" });
+					return;
+				}
+				
+				res.status(400).json({ message: "Приглашение в чат не найдено" });
+				return;
+			}
+		} 
+		catch (error) {
+			console.error("Ошибка при отклонении приглашения в чат", error);
+			res.status(500).json({ message: "Ошибка при отклонении приглашения в чат" });
+			return;
+		} 
 	}
 }
 

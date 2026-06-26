@@ -47,3 +47,11 @@ export const updateBasicUserInfo = async (userId: number, userInfo: IBasicUserIn
 		return { status: 500, message: "Ошибка сохранения данных пользователя" };
 	}
 };
+
+export const ensureUserExists = async (userId: number) => {
+	const userInfo = await db.query(
+		` SELECT * from users WHERE id = $1`,
+		[userId]
+	);
+	return userInfo.rows.length !== 0;
+};
