@@ -4,6 +4,7 @@ import { validateOnlyLettersAndNumbersStringValue } from "../../helpers/validati
 import { ensureUserExists } from "../../models/users/model-helpers";
 import { IChatInvitation } from "../../models/chats_invitations/chats_invitations";
 import { checkChatMember, ensureChatExists } from "../../models/chats/model-helpers";
+import { deleteInvitation } from "../../models/chats_invitations/model-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
@@ -155,20 +156,13 @@ class ChatController {
 			const invitationId = req.body.invitationId;
 
 			if (userId && invitationId) {
-				const deletedFilesResult = await db.query<IChatInvitation>(
-					`
-						DELETE FROM chats_invitations
-						WHERE id = $1 and user_id = $2
-						RETURNING id, chat_id, user_id
-					`,
-					[invitationId, userId]
-				);
+				const result = await deleteInvitation(invitationId, userId);
 
-				if (deletedFilesResult.rowCount !== 0) {
-					res.status(200).json({ message: "Успешное отклонение приглашения в чат" });
+				if (result.status === 200) {
+					res.status(200).json({ message: "Приглашение в чат успешно отклонено" });
 					return;
 				}
-				
+
 				res.status(400).json({ message: "Приглашение в чат не найдено" });
 				return;
 			}
