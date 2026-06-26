@@ -3,6 +3,7 @@ import { db } from "../../../db";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
+import { validateOnlyLettersAndNumbersStringValue } from "../../helpers/validation-helpers";
 
 class ChatController {
 	static async createChat(req: Request, res: Response) {
@@ -14,10 +15,17 @@ class ChatController {
 			const userId = userHelpers.getUserIdFromToken(req);
 			const { name, description } = req.body;
 
-			//Валидация обязательных полей
+			//Проверка наличия обязательных полей
 			if (!name || !description) {
 				await client.query("ROLLBACK");
 				res.status(400).json({ message: "Ошибка создания чата. Информация о чате не должна быть пустой" });
+				return;
+			}
+
+			//Валидация значений обязательных полей
+			if (validateOnlyLettersAndNumbersStringValue(name) && validateOnlyLettersAndNumbersStringValue(description)) {
+				await client.query("ROLLBACK");
+				res.status(400).json({ message: "Ошибка создания чата. Информация о чате должна соответствовать заданной структуре" });
 				return;
 			}
 
@@ -51,8 +59,9 @@ class ChatController {
 			const chat = insertResult.rows[0];
 			let finalImagePath = "";
 
+			//Если передали файл - сохраняем его в статику
 			if (req.files) {
-				const uploadPath = `/dialogs-files/${chat.id}`;
+				const uploadPath = `/chat-files/${chat.id}`;
 				const uploadResult = await fsHelpers.uploadFiles(req.files, uploadPath);
 				if (uploadResult.filelist && uploadResult.filelist.length > 0) {
 					finalImagePath = uploadResult.filelist[0].url;
