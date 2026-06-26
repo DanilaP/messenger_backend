@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { IDialogsMembers } from "./dialogs-members";
+import { IDialogsMembers } from "./dialogs_members";
 
 export async function insertDialogMembers(client: PoolClient, dialogId: number, userIds: number[]): Promise<IDialogsMembers[]> {
 	if (userIds.length === 0) return [];

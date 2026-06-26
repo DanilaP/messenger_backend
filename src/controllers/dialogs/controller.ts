@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
 import { db } from "../../../db";
-import { IDialogsMessage } from "../../models/dialogs-messages/dialogs-messages";
+import { IDialogsMessage } from "../../models/dialogs_messages/dialogs_messages";
 import { IDialogs } from "../../models/dialogs/dialogs";
-import { insertFiles } from "../../models/dialogs-files/model-helpers";
-import { insertDialogMembers } from "../../models/dialogs-members/model-helpers";
-import { IDialogsMembers } from "../../models/dialogs-members/dialogs-members";
+import { insertFiles } from "../../models/dialogs_files/model-helpers";
+import { insertDialogMembers } from "../../models/dialogs_members/model-helpers";
+import { IDialogsMembers } from "../../models/dialogs_members/dialogs_members";
 import { broadcastMessage } from "../../websocket/websocket";
-import { IFile } from "../../models/dialogs-files/dialogs-files";
+import { IFile } from "../../models/dialogs_files/dialogs_files";
 import { checkMember } from "../../models/dialogs/model-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";

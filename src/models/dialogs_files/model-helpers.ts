@@ -1,5 +1,5 @@
 import { PoolClient } from "pg";
-import { IFile } from "./dialogs-files";
+import { IFile } from "./dialogs_files";
 
 /**
  * Вставляет массив файлов в таблицу files за один запрос.
