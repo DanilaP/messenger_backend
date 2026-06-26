@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { db } from "../../../db";
+import { validateOnlyLettersAndNumbersStringValue } from "../../helpers/validation-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
-import { validateOnlyLettersAndNumbersStringValue } from "../../helpers/validation-helpers";
 
 class ChatController {
 	static async createChat(req: Request, res: Response) {
