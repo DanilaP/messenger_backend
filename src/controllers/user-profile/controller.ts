@@ -1,13 +1,30 @@
 import { Request, Response } from "express";
 import { db } from "../../../db";
 import { updateBasicUserInfo } from "../../models/users/model-helpers";
+import { IUser } from "../../models/users/users";
 import userHelpers from "../../helpers/user-helpers";
 import fsHelpers from "../../helpers/fs-helpers";
 
 class UserProfileController {
 	static async getProfile(req: Request, res: Response) {
 		try {
-			const user = await userHelpers.getUserFromToken(req);
+			const id = req.query?.id;
+			let user = null;
+
+			if (id) {
+				const userProfileInfo = await db.query<IUser>(
+					`SELECT id, name, surname, username, status, avatar, date_of_birth
+					FROM users
+					WHERE id = $1`,
+					[Number(id)]
+				);
+				user = userProfileInfo.rows[0];
+				user.avatar = `${ process.env.HOST_URL }${user.avatar}`;
+			}
+			else {
+				user = await userHelpers.getUserFromToken(req);
+			}
+
 			res.status(200).json({ message: "Успешное получение профиля пользователя", user });
 			return;
 		}

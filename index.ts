@@ -12,6 +12,7 @@ import DialogsRouter from "./src/controllers/dialogs/router";
 import UsersRouter from "./src/controllers/users/router";
 import UserProfileRouter from "./src/controllers/user-profile/router";
 import PublicationsRouter from "./src/controllers/publications/router";
+import ChatsRouter from "./src/controllers/chats/router";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -51,6 +52,7 @@ app.use("/dialogs", DialogsRouter);
 app.use("/users", UsersRouter);
 app.use("/profile", UserProfileRouter);
 app.use("/publications", PublicationsRouter);
+app.use("/chats", ChatsRouter);
 
 initWebSocket(server);
 
