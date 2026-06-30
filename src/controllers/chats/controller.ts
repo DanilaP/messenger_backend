@@ -5,9 +5,11 @@ import { ensureUserExists } from "../../models/users/model-helpers";
 import { IChatInvitation } from "../../models/chats_invitations/chats_invitations";
 import { checkChatMember, ensureChatExists } from "../../models/chats/model-helpers";
 import { deleteInvitation } from "../../models/chats_invitations/model-helpers";
+import { getChatMemberPermissions } from "../../helpers/chats-permissions-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
+import { removeMemberFromChat } from "../../models/chats_members/model-helpers";
 
 class ChatController {
 	static async createChat(req: Request, res: Response) {
@@ -170,6 +172,34 @@ class ChatController {
 		catch (error) {
 			console.error("Ошибка при отклонении приглашения в чат", error);
 			res.status(500).json({ message: "Ошибка при отклонении приглашения в чат" });
+			return;
+		} 
+	}
+	static async removeMemberFromChat(req: Request, res: Response) {
+		try {
+			const chatId = Number(req.query.chatId);
+			const memberId = Number(req.query.memberId);
+			const userId = userHelpers.getUserIdFromToken(req);
+			const permissions = await getChatMemberPermissions(userId, chatId);
+
+			if (permissions.includes("delete_member")) {
+				const deletedResult = await removeMemberFromChat(memberId, chatId);
+				
+				if (deletedResult.status === 200) {
+					res.status(200).json({ message: "Успешное удаления участника чата" });
+					return;
+				}
+				
+				res.status(400).json({ message: "Участник не найден" });
+				return;
+			}
+
+			res.status(403).json({ message: "Недостаточно прав" });
+			return;
+		} 
+		catch (error) {
+			console.error("Ошибка при удалении участника чата", error);
+			res.status(500).json({ message: "Ошибка при удалении участника чата" });
 			return;
 		} 
 	}
