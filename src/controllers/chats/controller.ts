@@ -134,8 +134,6 @@ class ChatController {
 				checkChatMember(chatId, memberId)
 			]);
 
-			console.log(userExists, chatExists, (chatMemberExists === false));
-
 			if (userExists && chatExists && (chatMemberExists === false)) {
 				const result = await db.query<IChatInvitation>(
 					`
