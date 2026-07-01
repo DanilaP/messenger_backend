@@ -3,7 +3,7 @@ import { db } from "../../../db";
 import { validateOnlyLettersAndNumbersStringValue } from "../../helpers/validation-helpers";
 import { ensureUserExists } from "../../models/users/model-helpers";
 import { IChatInvitation } from "../../models/chats_invitations/chats_invitations";
-import { checkChatMember, ensureChatExists } from "../../models/chats/model-helpers";
+import { changeBasicChatInfo, checkChatMember, ensureChatExists } from "../../models/chats/model-helpers";
 import { deleteInvitation, getInvitationInfoById } from "../../models/chats_invitations/model-helpers";
 import { getChatMemberPermissions } from "../../helpers/chats-permissions-helpers";
 import { addMemberToChat, removeMemberFromChat } from "../../models/chats_members/model-helpers";
@@ -259,6 +259,36 @@ class ChatController {
 		catch (error) {
 			console.error("Ошибка при удалении участника чата", error);
 			res.status(500).json({ message: "Ошибка при удалении участника чата" });
+			return;
+		} 
+	}
+	static async changeChatInfo(req: Request, res: Response) {
+		try {
+			const { chatId } = req.body;
+			const userId = userHelpers.getUserIdFromToken(req);
+			const userPermissions = await getChatMemberPermissions(userId, chatId);
+
+			if (!userPermissions.includes("edit_chat_info")) {
+				console.error("Доступ закрыт");
+				res.status(403).json({ message: "Доступ закрыт" });
+				return;
+			}
+
+			const updateChatInfoStatus = (await changeBasicChatInfo(req.body, chatId)).status;
+			
+			if (updateChatInfoStatus === 200) {
+				res.status(200).json({ message: "Успешное изменение информации о чате" });
+				return;
+			}
+
+			if (updateChatInfoStatus === 404) {
+				res.status(404).json({ message: "Информация о чате не найдена" });
+				return;
+			}
+		} 
+		catch (error) {
+			console.error("Ошибка при изменении информации о чате", error);
+			res.status(500).json({ message: "Ошибка при изменении информации о чате" });
 			return;
 		} 
 	}
