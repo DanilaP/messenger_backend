@@ -6,10 +6,10 @@ import { IChatInvitation } from "../../models/chats_invitations/chats_invitation
 import { checkChatMember, ensureChatExists } from "../../models/chats/model-helpers";
 import { deleteInvitation } from "../../models/chats_invitations/model-helpers";
 import { getChatMemberPermissions } from "../../helpers/chats-permissions-helpers";
+import { removeMemberFromChat } from "../../models/chats_members/model-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
-import { removeMemberFromChat } from "../../models/chats_members/model-helpers";
 
 class ChatController {
 	static async createChat(req: Request, res: Response) {
@@ -117,13 +117,21 @@ class ChatController {
 	}
 	static async sendInvitationToChat(req: Request, res: Response) {
 		try {
-			const { userId, chatId } = req.body;
+			const userId = userHelpers.getUserIdFromToken(req);
+			const { memberId, chatId } = req.body;
+			
+			const userPermissions = await getChatMemberPermissions(userId, chatId);
+
+			if (!userPermissions.includes("invite_member")) {
+				res.status(403).json({ message: "Отказано в доступе" });
+				return;
+			}
 
 			//Проверяем, что пользователь и чат существуют и, что данный пользователь - не участник чата
 			const [userExists, chatExists, chatMemberExists] = await Promise.all([
-				ensureUserExists(userId),
+				ensureUserExists(memberId),
 				ensureChatExists(chatId),
-				checkChatMember(chatId, userId)
+				checkChatMember(chatId, memberId)
 			]);
 
 			if (userExists && chatExists && (chatMemberExists === false)) {
@@ -133,7 +141,7 @@ class ChatController {
 						VALUES ($1, $2) 
 						RETURNING id, chat_id, user_id
 					`,
-					[chatId, userId]
+					[chatId, memberId]
 				);
 
 				res.status(200).json({ 
@@ -142,7 +150,6 @@ class ChatController {
 				});
 				return;
 			}
-
 			res.status(400).json({ message: "Некорректные данные приглашения" });
 			return;
 		} 
