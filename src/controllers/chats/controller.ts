@@ -4,9 +4,9 @@ import { validateOnlyLettersAndNumbersStringValue } from "../../helpers/validati
 import { ensureUserExists } from "../../models/users/model-helpers";
 import { IChatInvitation } from "../../models/chats_invitations/chats_invitations";
 import { checkChatMember, ensureChatExists } from "../../models/chats/model-helpers";
-import { deleteInvitation } from "../../models/chats_invitations/model-helpers";
+import { deleteInvitation, getInvitationInfoById } from "../../models/chats_invitations/model-helpers";
 import { getChatMemberPermissions } from "../../helpers/chats-permissions-helpers";
-import { removeMemberFromChat } from "../../models/chats_members/model-helpers";
+import { addMemberToChat, removeMemberFromChat } from "../../models/chats_members/model-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
@@ -134,6 +134,8 @@ class ChatController {
 				checkChatMember(chatId, memberId)
 			]);
 
+			console.log(userExists, chatExists, (chatMemberExists === false));
+
 			if (userExists && chatExists && (chatMemberExists === false)) {
 				const result = await db.query<IChatInvitation>(
 					`
@@ -165,14 +167,14 @@ class ChatController {
 			const invitationId = req.body.invitationId;
 
 			if (userId && invitationId) {
-				const result = await deleteInvitation(invitationId, userId);
+				const result = await deleteInvitation(db, invitationId, userId);
 
 				if (result.status === 200) {
 					res.status(200).json({ message: "Приглашение в чат успешно отклонено" });
 					return;
 				}
 
-				res.status(400).json({ message: "Приглашение в чат не найдено" });
+				res.status(400).json({ message: "Приглашение в чат не найдено или у вас недостаточно прав, чтобы его принять" });
 				return;
 			}
 		} 
@@ -181,6 +183,58 @@ class ChatController {
 			res.status(500).json({ message: "Ошибка при отклонении приглашения в чат" });
 			return;
 		} 
+	}
+	static async acceptInvitationToChat(req: Request, res: Response) {
+		const client = await db.getClient();
+
+		try {
+			await client.query("BEGIN");
+
+			const userId = userHelpers.getUserIdFromToken(req);
+			const invitationId = req.body.invitationId;
+			const invitationInfo = (await getInvitationInfoById(invitationId)).invitationInfo;
+			
+			if (userId && invitationId && invitationInfo) {
+
+				if (userId !== invitationInfo.user_id) {
+					res.status(403).json({ message: "Отказано в доступе" });
+					return;
+				}
+
+				const result = await deleteInvitation(client, invitationId, userId);
+
+				if (result.status === 404 || result.status === 500) {
+					await client.query("ROLLBACK");
+					console.error("Ошибка при принятии приглашения в чат. Приглашение не найдено");
+					res.status(500).json({ message: "Ошибка при принятии приглашения в чат. Приглашение не найдено" });
+					return;
+				}
+
+				if (result.status === 200) {
+					const insertResult = await addMemberToChat(invitationInfo.user_id, invitationInfo.chat_id);
+
+					if (insertResult.status === 200) {
+						await client.query("COMMIT");
+						res.status(200).json({ message: "Приглашение в чат успешно принято" });
+						return;
+					}
+					
+					await client.query("ROLLBACK");
+					res.status(insertResult.status).json({ message: "Ошибка при добавлении пользователя в чат" });
+					return;
+				}
+			}
+		} 
+		catch (error) {
+			await client.query("ROLLBACK");
+
+			console.error("Ошибка при принятии приглашения в чат", error);
+			res.status(500).json({ message: "Ошибка при принятии приглашения в чат" });
+			return;
+		} 
+		finally {
+			client.release();
+		}
 	}
 	static async removeMemberFromChat(req: Request, res: Response) {
 		try {

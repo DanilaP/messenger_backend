@@ -1,4 +1,30 @@
 import { db } from "../../../db";
+import { IChatMember } from "./chats_members";
+
+export const addMemberToChat = async (memberId: number, chatId: number) => {
+	const baseChatMemberRoleId = 2; //ID роли обычного участника чата
+
+	try {
+		const insertResult = await db.query<IChatMember>(
+			`INSERT INTO chats_members (chat_id, user_id, role_id) 
+			VALUES ($1, $2, $3) 
+			RETURNING id, chat_id, user_id, role_id`,
+			[chatId, memberId, baseChatMemberRoleId]
+		);
+		
+		if (insertResult.rows.length !== 0) {
+			const insertedMemberInfo = insertResult.rows[0];
+			return { status: 200, insertedMemberInfo: insertedMemberInfo };
+		}
+
+		return { status: 500, insertedMemberInfo: null };
+	}
+
+	catch(error) {
+		console.error(error);
+		return { status: 500, insertedMemberInfo: null };
+	}
+};
 
 export const removeMemberFromChat = async (memberId: number, chatId: number) => {
 	const deletedMemberInfo = await db.query(
