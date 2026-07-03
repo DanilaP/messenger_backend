@@ -85,7 +85,6 @@ export const areAllImages = (files: FileArray) => {
 
 	// Проверяем каждый файл
 	for (const file of fileArray) {
-		console.log(file.mimetype);
 		// У файла отсутствует mimetype или он не разрешён
 		if (!file.mimetype || !ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
 			return false;

@@ -1,4 +1,5 @@
 import { db } from "../../../db";
+import { IChat } from "./chats";
 
 interface IBasicChatInfo {
 	name?: string,
@@ -36,6 +37,19 @@ export const changeBasicChatInfo = async (updatedFields: IBasicChatInfo, chatId:
 	);
 	return { status: 200, message: "Данные о чате успешно обновлены" };
 
+};
+
+export const getChatInfoById = async (chatId: number) => {
+	const chatInfo = await db.query<IChat>(
+		`
+            SELECT * 
+            FROM chats 
+            WHERE id = $1
+        `
+		,
+		[chatId]
+	);
+	return chatInfo.rows[0];
 };
 
 export const ensureChatExists = async (chatId: number) => {

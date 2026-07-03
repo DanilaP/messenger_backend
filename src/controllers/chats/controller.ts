@@ -3,13 +3,15 @@ import { db } from "../../../db";
 import { validateOnlyLettersAndNumbersStringValue } from "../../helpers/validation-helpers";
 import { ensureUserExists } from "../../models/users/model-helpers";
 import { IChatInvitation } from "../../models/chats_invitations/chats_invitations";
-import { changeBasicChatInfo, checkChatMember, ensureChatExists } from "../../models/chats/model-helpers";
+import { changeBasicChatInfo, checkChatMember, ensureChatExists, getChatInfoById } from "../../models/chats/model-helpers";
 import { deleteInvitation, getInvitationInfoById } from "../../models/chats_invitations/model-helpers";
 import { getChatMemberPermissions } from "../../helpers/chats-permissions-helpers";
 import { addMemberToChat, removeMemberFromChat } from "../../models/chats_members/model-helpers";
 import moment from "moment";
 import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
+import dotenv from "dotenv";
+dotenv.config();
 
 class ChatController {
 	static async createChat(req: Request, res: Response) {
@@ -291,6 +293,86 @@ class ChatController {
 			res.status(500).json({ message: "Ошибка при изменении информации о чате" });
 			return;
 		} 
+	}
+	static async changeChatAvatar(req: Request, res: Response) {
+		const client = await db.getClient();
+
+		try {
+			await client.query("BEGIN");
+
+			const { chatId } = req.body;
+			const userId = userHelpers.getUserIdFromToken(req);
+			const userPermissions = await getChatMemberPermissions(userId, chatId);
+			
+			if (!userPermissions.includes("edit_chat_info")) {
+				await client.query("ROLLBACK");
+
+				console.error("Доступ закрыт");
+				res.status(403).json({ message: "Доступ закрыт" });
+				return;
+			}
+
+			//Проверка, что переданный файл - изображение
+			if (req.files && fsHelpers.areAllImages(req.files)) {
+				//Проверка, что передано не более 1 файла
+				if (req.files && Array.isArray(req.files?.files)) {
+					await client.query("ROLLBACK");
+					res.status(500).json({ message: "Ошибка при изменении информации о чате. Выбрано больше 1 файла" });
+					return;
+				}
+				//Путь к обновленному файлу
+				const imagePath = `/chat-files/${chatId}/avatar/`;
+				//Получаем информацию о чате
+				const chatInfo = await getChatInfoById(chatId);
+				//Удаляем файл аватара чата из статики (если путь отличен от базового)
+				if (chatInfo.image !== "/files/chat_base_avatar.png") {
+					const deletedAvatarInfo = await fsHelpers.removeFiles([chatInfo.image]);
+					//Если удаление прошло с ошибкой
+					if (deletedAvatarInfo.status === 500) {
+						await client.query("ROLLBACK");
+						res.status(500).json({ message: "Ошибка при замене файла" });
+						return;
+					}
+				}
+				//Сохраняем файл в статику
+				const uploadedFileInfo = await fsHelpers.uploadFiles(req.files, imagePath);
+				//Если файл сохранить не удалось
+				if (uploadedFileInfo.status === 500) {
+					await client.query("ROLLBACK");
+					res.status(500).json({ message: "Ошибка при сохранении файла" });
+					return;
+				}
+				const uploadedFileUrl = uploadedFileInfo.filelist[0].url;
+				//Сохраняем ссылку на обновленный файл в бд
+				await db.query(
+					`UPDATE chats SET image = $1 WHERE id = $2`,
+					[uploadedFileUrl, chatId]
+				);
+
+				//Коммитим успешную транзакцию
+				await client.query("COMMIT");
+				res.status(200).json({ 
+					message: "Успешное изменение аватара для чата", 
+					updatedFileUrl: `${ process.env.HOST_URL }${uploadedFileUrl}`
+				});
+				return;
+			}
+			else {
+				await client.query("ROLLBACK");
+				res.status(500).json({ message: "Ошибка при изменении информации о чате. Некорректный тип файла" });
+				return;
+			}
+		} 
+		catch (error) {
+			await client.query("ROLLBACK");
+
+			console.error("Ошибка при изменении информации о чате", error);
+			res.status(500).json({ message: "Ошибка при изменении информации о чате" });
+			return;
+		} 
+		finally {
+			client.release();
+		}
 	}
 }
 
