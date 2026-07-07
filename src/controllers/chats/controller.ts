@@ -374,6 +374,50 @@ class ChatController {
 			client.release();
 		}
 	}
+	static async getChats(req: Request, res: Response) {
+		try {
+			const userId = userHelpers.getUserIdFromToken(req);
+			const chatsSelectResult = await db.query(
+				`
+					SELECT
+						chats.id,
+						chats.name,
+						chats.image,
+						json_build_object(
+							'id', last_msg.id,
+							'text', last_msg.text,
+							'date', last_msg.date,
+							'sender_id', last_msg.sender_id,
+							'is_read', last_msg.is_read,
+							'reply_message_id', last_msg.replay_message_id
+						) AS last_message
+					FROM chats
+					JOIN chats_members ON chats_members.chat_id = chats.id AND chats_members.user_id = $1
+					LEFT JOIN LATERAL (
+						SELECT
+							id,
+							text,
+							date,
+							sender_id,
+							is_read,
+							replay_message_id
+						FROM chats_messages
+						WHERE chat_id = chats.id
+						ORDER BY date DESC
+						LIMIT 1
+					) last_msg ON true
+				`,
+				[userId]
+			);
+			res.status(200).json({ message: "Успешное получение информации о чатах", chats: chatsSelectResult.rows });
+			return;
+		} 
+		catch (error) {
+			console.error("Ошибка при получении информации о чатах", error);
+			res.status(500).json({ message: "Ошибка при получении информации о чатах" });
+			return;
+		} 
+	}
 }
 
 export default ChatController;
