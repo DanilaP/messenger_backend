@@ -10,5 +10,6 @@ router.post("/accept-invitation", ChatController.acceptInvitationToChat);
 router.post("/decline-invitation", ChatController.declineInvitationToChat);
 router.delete("/members", ChatController.removeMemberFromChat);
 router.patch("/avatar", ChatController.changeChatAvatar);
+router.post("/send-message", ChatController.sendMessage);
 
 export default router;

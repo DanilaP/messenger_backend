@@ -377,44 +377,155 @@ class ChatController {
 	static async getChats(req: Request, res: Response) {
 		try {
 			const userId = userHelpers.getUserIdFromToken(req);
-			const chatsSelectResult = await db.query(
-				`
+			const chatId = Number(req.query.chatId) || null;
+			const targetMessageId = Number(req.query.targetMessageId) || null;
+
+			//Получение детальной информации о конкретном чате
+			if (chatId) {
+				// Общая часть запроса (без CTE, только основной SELECT)
+				const baseQuery = `
 					SELECT
-						chats.id,
-						chats.name,
-						chats.image,
+						cm.id,
+						cm.text,
+						cm.date,
+						cm.is_read AS "isRead",
 						json_build_object(
-							'id', last_msg.id,
-							'text', last_msg.text,
-							'date', last_msg.date,
-							'sender_id', last_msg.sender_id,
-							'is_read', last_msg.is_read,
-							'reply_message_id', last_msg.replay_message_id
-						) AS last_message
-					FROM chats
-					JOIN chats_members ON chats_members.chat_id = chats.id AND chats_members.user_id = $1
-					LEFT JOIN LATERAL (
+							'id', u.id,
+							'name', u."name",
+							'surname', u.surname,
+							'avatar', u.avatar
+						) AS sender,
+						COALESCE(
+							json_agg(
+								json_build_object(
+									'name', cf.name,
+									'size', cf.size,
+									'type', cf.type,
+									'url', cf.url
+								)
+								ORDER BY cf.id
+							) FILTER (WHERE cf.id IS NOT NULL),
+							'[]'::json
+						) AS files
+					FROM chats_messages cm
+					LEFT JOIN chats_files cf ON cm.id = cf.message_id
+					JOIN users u ON cm.sender_id = u.id
+					WHERE cm.id IN (SELECT id FROM selected_ids)
+					GROUP BY cm.id, u.id
+					ORDER BY cm.id
+				`;
+
+				let queryText, queryParams;
+
+				if (targetMessageId) {
+					// Вариант с целевым сообщением (10 до + 10 после)
+					queryText = `
+						WITH
+						target AS (
+							SELECT id, chat_id
+							FROM chats_messages
+							WHERE id = $1
+						),
+						previous AS (
+							SELECT id
+							FROM chats_messages
+							WHERE chat_id = (SELECT chat_id FROM target)
+							AND id < (SELECT id FROM target)
+							ORDER BY id DESC
+							LIMIT 10
+						),
+						next AS (
+							SELECT id
+							FROM chats_messages
+							WHERE chat_id = (SELECT chat_id FROM target)
+							AND id > (SELECT id FROM target)
+							ORDER BY id ASC
+							LIMIT 10
+						),
+						selected_ids AS (
+							SELECT id FROM target
+							UNION
+							SELECT id FROM previous
+							UNION
+							SELECT id FROM next
+						)
+						${baseQuery}
+					`;
+					queryParams = [targetMessageId];
+				} else {
+					// Вариант без целевого – последние 10 сообщений чата
+					queryText = `
+						WITH selected_ids AS (
+							SELECT id
+							FROM chats_messages
+							WHERE chat_id = $1
+							ORDER BY id DESC
+							LIMIT 10
+						)
+						${baseQuery}
+					`;
+					queryParams = [chatId];
+				}
+
+				const chatSelectResult = await db.query(queryText, queryParams);
+				res.status(200).json({
+					message: "Успешное получение информации о чате",
+					messages: chatSelectResult.rows
+				});
+				return;
+			}
+			//Получение общей информации о чатах
+			else {
+				const chatsSelectResult = await db.query(
+					`
 						SELECT
-							id,
-							text,
-							date,
-							sender_id,
-							is_read,
-							replay_message_id
-						FROM chats_messages
-						WHERE chat_id = chats.id
-						ORDER BY date DESC
-						LIMIT 1
-					) last_msg ON true
-				`,
-				[userId]
-			);
-			res.status(200).json({ message: "Успешное получение информации о чатах", chats: chatsSelectResult.rows });
-			return;
+							chats.id,
+							chats.name,
+							chats.image,
+							json_build_object(
+								'id', last_msg.id,
+								'text', last_msg.text,
+								'date', last_msg.date,
+								'sender_id', last_msg.sender_id,
+								'is_read', last_msg.is_read,
+								'reply_message_id', last_msg.replay_message_id
+							) AS last_message
+						FROM chats
+						JOIN chats_members ON chats_members.chat_id = chats.id AND chats_members.user_id = $1
+						LEFT JOIN LATERAL (
+							SELECT
+								id,
+								text,
+								date,
+								sender_id,
+								is_read,
+								replay_message_id
+							FROM chats_messages
+							WHERE chat_id = chats.id
+							ORDER BY date DESC
+							LIMIT 1
+						) last_msg ON true
+					`,
+					[userId]
+				);
+				res.status(200).json({ message: "Успешное получение информации о чатах", chats: chatsSelectResult.rows });
+				return;	
+			}
 		} 
 		catch (error) {
 			console.error("Ошибка при получении информации о чатах", error);
 			res.status(500).json({ message: "Ошибка при получении информации о чатах" });
+			return;
+		} 
+	}
+	static async sendMessage(req: Request, res: Response) {
+		try {
+			res.status(200).json({ message: "Сообщение успешно отправлено" });
+			return;
+		} 
+		catch (error) {
+			console.error("Ошибка при отправке сообщения", error);
+			res.status(500).json({ message: "Ошибка при отправке сообщения" });
 			return;
 		} 
 	}
