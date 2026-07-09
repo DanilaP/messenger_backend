@@ -22,7 +22,7 @@ interface IMessage {
     sender_id: number;
     isread: boolean;
     files: Omit<IFile, "id" | "message_id">[];
-    replayMessage: number | null;
+    replyMessage: number | null;
 }
 
 class DialogsController {
@@ -33,7 +33,7 @@ class DialogsController {
 			await client.query("BEGIN");
 
 			const { text, opponentId } = req.body;
-			const replayMessageId = req.body.replayMessageId ? Number(req.body.replayMessageId) : null;
+			const replyMessageId = req.body.replyMessageId ? Number(req.body.replyMessageId) : null;
 			const userId = userHelpers.getUserIdFromToken(req);
 
 			if ((text || req.files) && opponentId && opponentId !== userId) {
@@ -45,7 +45,7 @@ class DialogsController {
 					sender_id: Number(userId),
 					isread: false,
 					files: [],
-					replayMessage: null
+					replyMessage: null
 				};
 
 				//Проверяем что оппоннет существует
@@ -108,10 +108,10 @@ class DialogsController {
 
 				//Добавляем в бд сообщение
 				const createdMessage = await client.query<IDialogsMessage>(
-					`INSERT INTO dialogs_messages (text, date, dialog_id, sender_id, replay_message_id) 
+					`INSERT INTO dialogs_messages (text, date, dialog_id, sender_id, reply_message_id) 
                     VALUES ($1, $2, $3, $4, $5) 
-                    RETURNING id, text, date, dialog_id, sender_id, replay_message_id`,
-					[text, message.date, Number(message.dialog_id), Number(message.sender_id), replayMessageId]
+                    RETURNING id, text, date, dialog_id, sender_id, reply_message_id`,
+					[text, message.date, Number(message.dialog_id), Number(message.sender_id), replyMessageId]
 				);
 
 				//Создаем файлы в бд
@@ -155,14 +155,14 @@ class DialogsController {
 					senderInfo: senderInfo.rows[0]
 				});
 
-				if (replayMessageId !== null) {
-					const replayedMessageInfo = await client.query(
+				if (replyMessageId !== null) {
+					const repliedMessageInfo = await client.query(
 						`SELECT id, text, sender_id as "senderId" 
                         FROM dialogs_messages 
                         WHERE dialog_id = $1 AND id = $2 FOR UPDATE`,
-						[Number(message.dialog_id), Number(replayMessageId)]
+						[Number(message.dialog_id), Number(replyMessageId)]
 					);
-					message.replayMessage = replayedMessageInfo.rows[0];
+					message.replyMessage = repliedMessageInfo.rows[0];
 				}
 
 				res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: message });
@@ -450,20 +450,20 @@ class DialogsController {
                                 ) FILTER (WHERE f.id IS NOT NULL),
                                 '[]'::json
                             ) AS files,
-                            CASE WHEN m.replay_message_id IS NOT NULL THEN
+                            CASE WHEN m.reply_message_id IS NOT NULL THEN
                                 json_build_object(
                                     'id', rm.id,
                                     'text', rm.text,
                                     'senderId', rm.sender_id
                                 )
-                            ELSE NULL END AS "replayMessage",
+                            ELSE NULL END AS "repliedMessage",
                             ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
                         FROM dialogs_messages m
                         LEFT JOIN dialogs_files f ON f.message_id = m.id
-                        LEFT JOIN dialogs_messages rm ON rm.id = m.replay_message_id
+                        LEFT JOIN dialogs_messages rm ON rm.id = m.reply_message_id
                         WHERE m.dialog_id = $1
                         GROUP BY 
-                            m.id, m.is_read, m.text, m.date, m.sender_id, m.replay_message_id,
+                            m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
                             rm.id, rm.text, rm.sender_id
                     )
                 `;
@@ -481,7 +481,7 @@ class DialogsController {
                         , target_rn AS (
                             SELECT rn FROM full_data WHERE message_id = $2
                         )
-                        SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
+                        SELECT message_id, isread, text, date, sender_id, files, "replyMessage"
                         FROM full_data
                         WHERE ${rangeCondition}
                         ORDER BY ts ASC, message_id ASC
@@ -490,7 +490,7 @@ class DialogsController {
 				} else {
 					// Последние 10 сообщений
 					messagesQuery = baseCTE + `
-                        SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
+                        SELECT message_id, isread, text, date, sender_id, files, "replyMessage"
                         FROM (
                             SELECT * FROM full_data
                             ORDER BY ts DESC
@@ -812,26 +812,26 @@ class DialogsController {
                                     ) FILTER (WHERE f.id IS NOT NULL),
                                     '[]'::json
                                 ) AS files,
-                                CASE WHEN m.replay_message_id IS NOT NULL THEN
+                                CASE WHEN m.reply_message_id IS NOT NULL THEN
                                     json_build_object(
                                         'id', rm.id,
                                         'text', rm.text,
                                         'senderId', rm.sender_id
                                     )
-                                ELSE NULL END AS "replayMessage",
+                                ELSE NULL END AS "repliedMessage",
                                 ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
                             FROM dialogs_messages m
                             LEFT JOIN dialogs_files f ON f.message_id = m.id
-                            LEFT JOIN dialogs_messages rm ON rm.id = m.replay_message_id
+                            LEFT JOIN dialogs_messages rm ON rm.id = m.reply_message_id
                             WHERE m.dialog_id = $1
                             GROUP BY 
-                                m.id, m.is_read, m.text, m.date, m.sender_id, m.replay_message_id,
+                                m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
                                 rm.id, rm.text, rm.sender_id
                         ),
                         target_rn AS (
                             SELECT rn FROM full_data WHERE message_id = $2
                         )
-                        SELECT message_id, isread, text, date, sender_id, files, "replayMessage"
+                        SELECT message_id, isread, text, date, sender_id, files, "repliedMessage"
                         FROM full_data
                         WHERE rn BETWEEN (SELECT rn FROM target_rn) - 11 AND (SELECT rn FROM target_rn) + 11
                         ORDER BY ts ASC, message_id ASC
