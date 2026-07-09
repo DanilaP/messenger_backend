@@ -481,7 +481,7 @@ class DialogsController {
                         , target_rn AS (
                             SELECT rn FROM full_data WHERE message_id = $2
                         )
-                        SELECT message_id, isread, text, date, sender_id, files, "replyMessage"
+                        SELECT message_id, isread, text, date, sender_id, files, "repliedMessage"
                         FROM full_data
                         WHERE ${rangeCondition}
                         ORDER BY ts ASC, message_id ASC
@@ -490,7 +490,7 @@ class DialogsController {
 				} else {
 					// Последние 10 сообщений
 					messagesQuery = baseCTE + `
-                        SELECT message_id, isread, text, date, sender_id, files, "replyMessage"
+                        SELECT message_id, isread, text, date, sender_id, files, "repliedMessage"
                         FROM (
                             SELECT * FROM full_data
                             ORDER BY ts DESC
