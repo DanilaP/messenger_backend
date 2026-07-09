@@ -488,7 +488,7 @@ class ChatController {
 								'date', last_msg.date,
 								'sender_id', last_msg.sender_id,
 								'is_read', last_msg.is_read,
-								'reply_message_id', last_msg.replay_message_id
+								'reply_message_id', last_msg.reply_message_id
 							) AS last_message
 						FROM chats
 						JOIN chats_members ON chats_members.chat_id = chats.id AND chats_members.user_id = $1
@@ -499,7 +499,7 @@ class ChatController {
 								date,
 								sender_id,
 								is_read,
-								replay_message_id
+								reply_message_id
 							FROM chats_messages
 							WHERE chat_id = chats.id
 							ORDER BY date DESC
