@@ -22,7 +22,7 @@ interface IMessage {
     sender_id: number;
     isread: boolean;
     files: Omit<IFile, "id" | "message_id">[];
-    replyMessage: number | null;
+    repliedMessage: number | null;
 }
 
 class DialogsController {
@@ -45,7 +45,7 @@ class DialogsController {
 					sender_id: Number(userId),
 					isread: false,
 					files: [],
-					replyMessage: null
+					repliedMessage: null
 				};
 
 				//Проверяем что оппоннет существует
@@ -162,7 +162,7 @@ class DialogsController {
                         WHERE dialog_id = $1 AND id = $2 FOR UPDATE`,
 						[Number(message.dialog_id), Number(replyMessageId)]
 					);
-					message.replyMessage = repliedMessageInfo.rows[0];
+					message.repliedMessage = repliedMessageInfo.rows[0];
 				}
 
 				res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: message });
