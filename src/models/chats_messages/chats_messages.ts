@@ -5,5 +5,5 @@ export interface IChatMessage {
     chat_id: number,
     sender_id: number,
     is_read: boolean,
-    replay_message_id: number //FK
+    reply_message_id: number //FK
 }

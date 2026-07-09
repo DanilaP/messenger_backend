@@ -5,5 +5,5 @@ export interface IDialogsMessage {
     is_read: boolean,
     dialog_id: number, //FK
     sender_id: number, //FK
-    replay_message_id: number //FK
+    reply_message_id: number //FK
 }

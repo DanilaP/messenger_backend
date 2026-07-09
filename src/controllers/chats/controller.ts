@@ -519,15 +519,25 @@ class ChatController {
 		} 
 	}
 	static async sendMessage(req: Request, res: Response) {
+		const client = await db.getClient();
+
 		try {
+			await client.query("BEGIN");
+			const { chatId, text, replyMessageId } = req.body;
+
 			res.status(200).json({ message: "Сообщение успешно отправлено" });
 			return;
 		} 
 		catch (error) {
+			await client.query("ROLLBACK");
+
 			console.error("Ошибка при отправке сообщения", error);
 			res.status(500).json({ message: "Ошибка при отправке сообщения" });
 			return;
 		} 
+		finally {
+			client.release();
+		}
 	}
 }
 
