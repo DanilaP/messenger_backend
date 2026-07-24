@@ -7,8 +7,11 @@ import { changeBasicChatInfo, checkChatMember, ensureChatExists, getChatInfoById
 import { deleteInvitation, getInvitationInfoById } from "../../models/chats_invitations/model-helpers";
 import { getChatMemberPermissions } from "../../helpers/chats-permissions-helpers";
 import { addMemberToChat, removeMemberFromChat } from "../../models/chats_members/model-helpers";
+import { IChatMessage } from "../../models/chats_messages/chats_messages";
+import { insertFilesToChatsFiles } from "../../models/chats_files/chats-files-helpers";
+import { broadcastMessage } from "../../websocket/websocket";
+import fsHelpers, { IFile } from "../../helpers/fs-helpers";
 import moment from "moment";
-import fsHelpers from "../../helpers/fs-helpers";
 import userHelpers from "../../helpers/user-helpers";
 import dotenv from "dotenv";
 dotenv.config();
@@ -523,9 +526,121 @@ class ChatController {
 
 		try {
 			await client.query("BEGIN");
+			const userId = userHelpers.getUserIdFromToken(req);
+			const files = req.files || null;
 			const { chatId, text, replyMessageId } = req.body;
 
-			res.status(200).json({ message: "Сообщение успешно отправлено" });
+			const message = {
+				id: 0,
+				text: text || "",
+				date: moment(Date.now()).format("DD:MM:YYYY HH:mm:ss"),
+				chat_id: Number(chatId),
+				sender_id: Number(userId),
+				is_read: false,
+				files: [] as IFile[],
+				repliedMessage: null
+			};
+
+			if (chatId && (text || files)) {
+				const userChatPermissions = await getChatMemberPermissions(userId, chatId);
+
+				//Если нет разрешения на отправку сообщений в чат
+				if (!userChatPermissions.includes("send_messages")) {
+					await client.query("ROLLBACK");
+					res.status(403).json({ message: "Доступ закрыт" });
+					return;
+				}
+
+				//Сохраняем сообщение в бд
+				const insertResult = await client.query<IChatMessage>(
+					`
+						INSERT INTO chats_messages (text, date, chat_id, sender_id, is_read, reply_message_id) 
+						VALUES ($1, $2, $3, $4, $5, $6) 
+						RETURNING id, text, date, chat_id, sender_id, is_read, reply_message_id
+					`,
+					[
+						message.text, 
+						message.date, 
+						message.chat_id, 
+						message.sender_id, 
+						message.is_read, 
+						Number(replyMessageId) || null
+					]
+				);
+
+				//Если сообщение не сохранено
+				if (!insertResult.rows[0].id) {
+					await client.query("ROLLBACK");
+					res.status(500).json({ message: "Ошибка при сохранении сообщения" });
+					return;
+				}
+				
+				message.id = insertResult.rows[0].id;
+				
+				if (files) {
+					//Сохраняем файлы в статику
+					const savedFilesInfo = 
+						(await (fsHelpers.uploadFiles(files, `/chat-files/${message.chat_id}/files`))).filelist || [];
+					message.files = savedFilesInfo;
+
+					//Сохраняем информацию о файлах в бд
+					if (message.files.length > 0) {
+						const modifiedFiles = message.files.map(file => { 
+							return {
+								...file, 
+								message_id: message.id
+							};
+						});
+						const createdFiles = await insertFilesToChatsFiles(client, modifiedFiles);
+						
+						if (createdFiles.length === 0) {
+							await client.query("ROLLBACK");
+							res.status(500).json({ message: "Ошибка при отправке сообщения. Ошибка при сохранении файлов" });
+							return;
+						}
+	
+						message.files = createdFiles;
+					}
+				}
+
+				let repliedMessageInfo = null;
+				const [senderInfo, chatMembersIds] = await Promise.all([
+					db.query(
+						"SELECT id, name, surname, avatar FROM users WHERE id = $1",
+						[userId]
+					),
+					db.query(
+						"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
+						[message.chat_id]
+					)
+				]);
+
+				if (replyMessageId !== null) {
+					repliedMessageInfo = await client.query(
+						`
+							SELECT id, text, sender_id as "senderId" 
+							FROM chats_messages 
+							WHERE chat_id = $1 AND id = $2 FOR UPDATE
+						`,
+						[Number(message.chat_id), (Number(replyMessageId) || null)]
+					);
+					message.repliedMessage = repliedMessageInfo.rows[0];
+				}
+
+				broadcastMessage([chatMembersIds.rows[0]], {
+					type: "new_message_dialog",
+					dialogId: message.chat_id,
+					message: message,
+					senderInfo: senderInfo.rows[0]
+				});
+				
+				await client.query("COMMIT");
+				res.status(200).json({ message: "Сообщение успешно отправлено" });
+				return;
+			}
+
+			await client.query("ROLLBACK");
+			res.status(400).json({ message: "Сообщение не должно быть пустым" });
 			return;
 		} 
 		catch (error) {

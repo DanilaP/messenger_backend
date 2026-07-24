@@ -2,7 +2,7 @@ import { FileArray } from "express-fileupload";
 import fs from "fs";
 import path from "path";
 
-interface IFile {
+export interface IFile {
     url: string,
     name: string,
     size: number,
