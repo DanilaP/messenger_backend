@@ -627,7 +627,7 @@ class ChatController {
 					message.repliedMessage = repliedMessageInfo.rows[0];
 				}
 
-				broadcastMessage([chatMembersIds.rows[0]], {
+				broadcastMessage(chatMembersIds.rows.map(el => el.user_id), {
 					type: "new_message_dialog",
 					dialogId: message.chat_id,
 					message: message,
@@ -648,6 +648,97 @@ class ChatController {
 
 			console.error("Ошибка при отправке сообщения", error);
 			res.status(500).json({ message: "Ошибка при отправке сообщения" });
+			return;
+		} 
+		finally {
+			client.release();
+		}
+	}
+	static async deleteMessage(req: Request, res: Response) {
+		const client = await db.getClient();
+
+		try {
+			await client.query("BEGIN");
+
+			const { messagesIds, chatId } = req.body;
+			const userId = userHelpers.getUserIdFromToken(req);
+
+			if (messagesIds.length !== 0 && chatId) {
+				const userChatPermissions = await getChatMemberPermissions(userId, chatId);
+
+				//Если нет разрешения на удаление сообщений в чате
+				if (!userChatPermissions.includes("delete_messages")) {
+					await client.query("ROLLBACK");
+					res.status(403).json({ message: "Доступ закрыт" });
+					return;
+				}
+
+				//Удаляем ссылки на файлы статики из бд
+				const deletedFilesResult = await client.query(
+					`
+                        DELETE FROM chats_files
+                        WHERE message_id = ANY($1::int[])
+                        RETURNING url
+                    `,
+					[messagesIds]
+				);
+
+				//Удаляем статику 
+				const deletedFilesUrls = deletedFilesResult.rows.map(row => {
+					return row.url;
+				});
+				const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
+
+				if (deleteFilesStatus.status === 500) {
+					await client.query("ROLLBACK");
+					res.status(500).json({ 
+						message: "Ошибка при удалении сообщений. Ошибка при удалении медиа файлов" 
+					});
+					return;
+				}
+
+				//Удаляем сообщения из бд
+				const deletedMessagesResult = await client.query(
+					`
+                        DELETE FROM chats_messages
+                        WHERE chat_id = $1 AND id = ANY($2::int[]) and sender_id = $3
+                    `,
+					[chatId, messagesIds, userId]
+				);
+
+				const deletedCount = deletedMessagesResult.rowCount; 
+
+				if (deletedCount === 0) {
+					await client.query("ROLLBACK");
+					res.status(500).json({ message: "Ошибка при удалении сообщений. Сообщения или диалог не найдены" });
+					return;
+				}
+
+				const chatMembersIds = await db.query(
+					"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
+					[chatId]
+				);
+				
+				broadcastMessage(chatMembersIds.rows.map(el => el.user_id), {
+					type: "delete_message_dialog",
+					dialogId: chatId,
+					deletedMessagesIds: messagesIds
+				});
+
+				await client.query("COMMIT");
+				res.status(200).json({ message: "Сообщение успешно удалено" });
+				return;
+			}
+
+			await client.query("ROLLBACK");
+			res.status(400).json({ message: "Данные о сообщении не должны быть пустыми" });
+			return;
+		} 
+		catch (error) {
+			await client.query("ROLLBACK");
+
+			console.error("Ошибка при удалении сообщения", error);
+			res.status(500).json({ message: "Ошибка при удалении сообщения" });
 			return;
 		} 
 		finally {
