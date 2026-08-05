@@ -745,6 +745,155 @@ class ChatController {
 			client.release();
 		}
 	}
+	static async changeMessage(req: Request, res: Response) {
+		const client = await db.getClient();
+
+		try {
+			await client.query("BEGIN");
+			const { chatId, messageId, text } = req.body;
+			const userId = userHelpers.getUserIdFromToken(req);
+
+			const modifiedMessageInfo: { id: number, text: string, files: Partial<IFile>[] } = {
+				id: messageId,
+				text: text,
+				files: []
+			};
+
+			if (chatId && messageId) {
+				const userChatPermissions = await getChatMemberPermissions(userId, chatId);
+
+				//Если нет разрешения на редактирование сообщений в чате
+				if (!userChatPermissions.includes("edit_messages")) {
+					await client.query("ROLLBACK");
+					res.status(403).json({ message: "Доступ закрыт" });
+					return;
+				}
+
+				//Если передан изменённый текст
+				if (text) {
+					const updatedMessage = await client.query(
+						`
+							UPDATE chats_messages
+							SET text = $4
+							WHERE chats_messages.sender_id = $1 and chats_messages.chat_id = $2 and chats_messages.id = $3;
+						`,
+						[userId, chatId, messageId, text]
+					);
+					//Если изменения не внеслись
+					if (updatedMessage.rowCount === 0) {
+						await client.query("ROLLBACK");
+						res.status(500).json({ 
+							message: "Ошибка при изменении сообщения. Ошибка записи данных" 
+						});
+						return;
+					}
+				}
+				//Если необходимо удалить предыдущие файлы сообщения
+				if (req.body.deleteMessageFiles) {
+					//Удаляем ссылки на файлы статики из бд
+					const deletedFilesResult = await client.query(
+						`
+							DELETE FROM chats_files
+							WHERE message_id = $1
+							RETURNING url
+						`,
+						[messageId]
+					);	
+					//Удаляем статику 
+					const deletedFilesUrls = deletedFilesResult.rows.map(row => {
+						return row.url;
+					});
+
+					const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
+					
+					if (deleteFilesStatus.status === 500) {
+						await client.query("ROLLBACK");
+						res.status(500).json({ 
+							message: "Ошибка при удалении сообщений. Ошибка при удалении предыдущих медиа файлов" 
+						});
+						return;
+					}
+				}
+				//Если передали файлы на замену
+				else if (req.files) {
+					//Удаляем ссылки на файлы статики из бд
+					const deletedFilesResult = await client.query(
+						`
+							DELETE FROM chats_files
+							WHERE message_id = $1
+							RETURNING url
+						`,
+						[messageId]
+					);
+										
+					//Удаляем статику 
+					const deletedFilesUrls = deletedFilesResult.rows.map(row => {
+						return row.url;
+					});
+					const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
+					
+					if (deleteFilesStatus.status === 500) {
+						await client.query("ROLLBACK");
+						res.status(500).json({ 
+							message: "Ошибка при удалении сообщений. Ошибка при удалении предыдущих медиа файлов" 
+						});
+						return;
+					}
+					
+					//Сохраняем новые файлы в статику
+					const uploadedFiles = (await fsHelpers.uploadFiles(req.files, `/chat-files/${chatId}/files`));
+					
+					modifiedMessageInfo.files = uploadedFiles.filelist;
+					
+					if (uploadedFiles.status === 500) {
+						await client.query("ROLLBACK");
+						res.status(500).json({ message: "Ошибка при редактировании сообщения. Ошибка при сохранении файлов в статике" });
+						return;
+					}
+					
+					const modifiedFiles = uploadedFiles.filelist.map(file => { 
+						return {
+							...file, 
+							message_id: messageId
+						};
+					});
+					const createdFiles = await insertFilesToChatsFiles(client, modifiedFiles);
+										
+					if (createdFiles.length === 0) {
+						await client.query("ROLLBACK");
+						res.status(500).json({ message: "Ошибка при редактировании сообщения. Ошибка при сохранении файлов в базу" });
+						return;
+					}
+				}
+
+				const chatMembersIds = await db.query<{ user_id: number }>(
+					"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
+					[chatId]
+				);
+
+				broadcastMessage(chatMembersIds.rows.map(el => el.user_id), {
+					type: "change_message_dialog",
+					dialogId: chatId,
+					message: modifiedMessageInfo
+				});
+
+				await client.query("COMMIT");
+				res.status(200).json({ message: "Сообщение успешно изменено", modifiedMessageInfo });
+				return;
+			}
+
+			await client.query("ROLLBACK");
+			res.status(500).json({ message: "Сообщение или чат не найдены" });
+		} 
+		catch (error) {
+			await client.query("ROLLBACK");
+			console.error("Ошибка при изменении сообщения", error);
+			res.status(500).json({ message: "Ошибка при изменении сообщения" });
+		} 
+		finally {
+			client.release();
+		}
+	}
 }
 
 export default ChatController;
