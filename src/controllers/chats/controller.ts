@@ -894,6 +894,64 @@ class ChatController {
 			client.release();
 		}
 	}
+	static async readMessagesInCertainChat(req: Request, res: Response) {
+		const client = await db.getClient();
+		
+		try {
+			await client.query("BEGIN");
+
+			const { chatId } = req.body;
+			const userId = userHelpers.getUserIdFromToken(req);
+
+			if (chatId) {
+				
+				const [isMember, chatMembersIds] = await Promise.all([
+					checkChatMember(chatId, userId),
+					db.query<{ user_id: number }>(
+						"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
+						[chatId]
+					)
+				]);
+
+				if (isMember) {
+					const updatedMessages = await db.query(
+						` 
+                            UPDATE chats_messages 
+                            SET is_read = true 
+                            WHERE chat_id = $1 and sender_id <> $2 and is_read <> true
+                            RETURNING id as message_id, is_read as isread
+                        `,
+						[chatId, userId]
+					);
+
+					broadcastMessage(chatMembersIds.rows.map(el => el.user_id), {
+						type: "read_message_dialog",
+						dialogId: chatId,
+						readMessages: updatedMessages.rows
+					});
+
+					res.status(200).json({ message: "Сообщения успешно прочитаны", readMessages: updatedMessages.rows });
+					return;
+				}
+				else {
+					res.status(403).json({ message: "Ошибка при прочтении сообщений. Вы не являетесь участником данного чата" });
+					return;
+				}
+			}
+
+			await client.query("ROLLBACK");
+			res.status(400).json({ message: "Чат не найден" });
+			return;
+		} 
+		catch (error) {
+			await client.query("ROLLBACK");
+			console.error("Ошибка прочтения сообщений:", error);
+			res.status(500).json({ message: "Ошибка прочтения сообщений" });
+		} 
+		finally {
+			client.release();
+		}
+	}
 }
 
 export default ChatController;
