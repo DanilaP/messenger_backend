@@ -788,7 +788,7 @@ class DialogsController {
 			const { dialogId, messageId } = req.body;
 
 			if (dialogId && messageId) {
-				const isMember = checkMember(userId, dialogId);
+				const isMember = await checkMember(userId, dialogId);
 				if (!isMember) {
 					res.status(403).json({ 
 						message: "Ошибка при скролле к сообщению. Вы не являетесь участником данного диалога" 

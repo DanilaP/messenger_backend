@@ -943,6 +943,78 @@ class ChatController {
 			client.release();
 		}
 	}
+	static async scrollToMessage(req: Request, res: Response) {
+		try {
+			const userId = userHelpers.getUserIdFromToken(req);
+			const { chatId, messageId } = req.body;
+	
+			if (chatId && messageId) {
+				const isMember = await checkChatMember(userId, chatId);
+				if (!isMember) {
+					res.status(403).json({ 
+						message: "Ошибка при скролле к сообщению. Вы не являетесь участником данного диалога" 
+					});
+					return;
+				}
+				else {
+					const query = `
+							WITH full_data AS (
+								SELECT 
+									m.id AS message_id,
+									m.is_read AS isread,
+									m.text,
+									m.date,
+									m.sender_id,
+									TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
+									COALESCE(
+										json_agg(
+											json_build_object('name', f.name, 'size', f.size, 'type', f.type, 'url', f.url)
+											ORDER BY f.id
+										) FILTER (WHERE f.id IS NOT NULL),
+										'[]'::json
+									) AS files,
+									CASE WHEN m.reply_message_id IS NOT NULL THEN
+										json_build_object(
+											'id', rm.id,
+											'text', rm.text,
+											'senderId', rm.sender_id
+										)
+									ELSE NULL END AS "repliedMessage",
+									ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
+								FROM chats_messages m
+								LEFT JOIN chats_files f ON f.message_id = m.id
+								LEFT JOIN chats_messages rm ON rm.id = m.reply_message_id
+								WHERE m.chat_id = 5
+								GROUP BY 
+									m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
+									rm.id, rm.text, rm.sender_id
+							),
+							target_rn AS (
+								SELECT rn FROM full_data WHERE message_id = 18
+							)
+							SELECT message_id, isread, text, date, sender_id, files, "repliedMessage"
+							FROM full_data
+							WHERE rn BETWEEN (SELECT rn FROM target_rn) - 11 AND (SELECT rn FROM target_rn) + 11
+							ORDER BY ts ASC, message_id ASC
+						`;
+	
+					const result = await db.query(query, [chatId, messageId]);
+	
+					res.status(200).json({ message: "Сообщения успешно получены", messages: result.rows });
+					return;
+				}
+			}
+			else {
+				res.status(400).json({ message: "Ошибка при скролле к сообщению. Чат или сообщение не найдены" });
+				return;
+			}
+		}
+		catch (error) {
+			res.status(500).json({ message: "Ошибка при скролле к сообщению" });
+			console.log(error);
+			return;
+		}
+	}
 }
 
 export default ChatController;
