@@ -6,9 +6,9 @@ import { IChatInvitation } from "../../models/chats_invitations/chats_invitation
 import { changeBasicChatInfo, checkChatMember, ensureChatExists, getChatInfoById } from "../../models/chats/model-helpers";
 import { deleteInvitation, getInvitationInfoById } from "../../models/chats_invitations/model-helpers";
 import { getChatMemberPermissions } from "../../helpers/chats-permissions-helpers";
-import { addMemberToChat, removeMemberFromChat } from "../../models/chats_members/model-helpers";
+import { addMemberToChat, getChatMembersIds, removeMemberFromChat } from "../../models/chats_members/model-helpers";
 import { IChatMessage } from "../../models/chats_messages/chats_messages";
-import { insertFilesToChatsFiles } from "../../models/chats_files/chats-files-helpers";
+import { insertFilesToChatsFiles } from "../../models/chats_files/model-helpers";
 import { broadcastMessage } from "../../websocket/websocket";
 import fsHelpers, { IFile } from "../../helpers/fs-helpers";
 import moment from "moment";
@@ -714,12 +714,9 @@ class ChatController {
 					return;
 				}
 
-				const chatMembersIds = await db.query(
-					"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
-					[chatId]
-				);
+				const chatMembersIds = await getChatMembersIds(chatId);
 				
-				broadcastMessage(chatMembersIds.rows.map(el => el.user_id), {
+				broadcastMessage(chatMembersIds, {
 					type: "delete_message_dialog",
 					dialogId: chatId,
 					deletedMessagesIds: messagesIds
@@ -866,12 +863,9 @@ class ChatController {
 					}
 				}
 
-				const chatMembersIds = await db.query<{ user_id: number }>(
-					"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
-					[chatId]
-				);
+				const chatMembersIds = await getChatMembersIds(chatId);
 
-				broadcastMessage(chatMembersIds.rows.map(el => el.user_id), {
+				broadcastMessage(chatMembersIds, {
 					type: "change_message_dialog",
 					dialogId: chatId,
 					message: modifiedMessageInfo
@@ -907,10 +901,7 @@ class ChatController {
 				
 				const [isMember, chatMembersIds] = await Promise.all([
 					checkChatMember(chatId, userId),
-					db.query<{ user_id: number }>(
-						"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
-						[chatId]
-					)
+					getChatMembersIds(chatId)
 				]);
 
 				if (isMember) {
@@ -924,7 +915,7 @@ class ChatController {
 						[chatId, userId]
 					);
 
-					broadcastMessage(chatMembersIds.rows.map(el => el.user_id), {
+					broadcastMessage(chatMembersIds, {
 						type: "read_message_dialog",
 						dialogId: chatId,
 						readMessages: updatedMessages.rows

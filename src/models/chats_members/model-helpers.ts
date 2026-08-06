@@ -35,3 +35,11 @@ export const removeMemberFromChat = async (memberId: number, chatId: number) => 
 
 	return { status: 500, deletedMemberInfo: null };
 };
+
+export const getChatMembersIds = async (chatId: number) => {
+	const chatMembersIds = await db.query(
+		"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
+		[chatId]
+	);
+	return chatMembersIds.rows.map(el => el.user_id);
+};
