@@ -388,16 +388,28 @@ class ChatController {
 				// Общая часть запроса (без CTE, только основной SELECT)
 				const baseQuery = `
 					SELECT
-						cm.id,
+						cm.id as "message_id",
 						cm.text,
 						cm.date,
-						cm.is_read AS "isRead",
+						cm.is_read AS "isread",
 						json_build_object(
 							'id', u.id,
 							'name', u."name",
 							'surname', u.surname,
 							'avatar', u.avatar
 						) AS sender,
+						CASE WHEN cm.reply_message_id is not null then
+							json_build_object(
+								'id', cm1.id,
+								'text', cm1."text",
+								'senderId', json_build_object(
+									'id', repliedMessageSenderInfo."id",
+									'name', repliedMessageSenderInfo."name",
+									'surname', repliedMessageSenderInfo."surname",
+									'avatar', repliedMessageSenderInfo."avatar"
+								)
+							)
+						ELSE NULL END AS "repliedMessage",
 						COALESCE(
 							json_agg(
 								json_build_object(
@@ -412,9 +424,11 @@ class ChatController {
 						) AS files
 					FROM chats_messages cm
 					LEFT JOIN chats_files cf ON cm.id = cf.message_id
-					JOIN users u ON cm.sender_id = u.id
+					LEFT JOIN chats_messages cm1 ON cm.reply_message_id = cm1.id
+					LEFT JOIN users repliedMessageSenderInfo ON cm1.sender_id = repliedMessageSenderInfo.id
+					JOIN users u ON cm.sender_id = u.id 
 					WHERE cm.id IN (SELECT id FROM selected_ids)
-					GROUP BY cm.id, u.id
+					GROUP BY cm.id, u.id, cm1.id, repliedMessageSenderInfo.id
 					ORDER BY cm.id
 				`;
 
@@ -473,7 +487,10 @@ class ChatController {
 				const chatSelectResult = await db.query(queryText, queryParams);
 				res.status(200).json({
 					message: "Успешное получение информации о чате",
-					messages: chatSelectResult.rows
+					chat: {
+						id: chatId,
+						messages: chatSelectResult.rows
+					}
 				});
 				return;
 			}
@@ -482,16 +499,13 @@ class ChatController {
 				const chatsSelectResult = await db.query(
 					`
 						SELECT
-							chats.id,
+							chats.id as "chat_id",
 							chats.name,
 							chats.image,
 							json_build_object(
 								'id', last_msg.id,
 								'text', last_msg.text,
-								'date', last_msg.date,
-								'sender_id', last_msg.sender_id,
-								'is_read', last_msg.is_read,
-								'reply_message_id', last_msg.reply_message_id
+								'date', last_msg.date
 							) AS last_message
 						FROM chats
 						JOIN chats_members ON chats_members.chat_id = chats.id AND chats_members.user_id = $1
