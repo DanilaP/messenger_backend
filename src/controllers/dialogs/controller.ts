@@ -15,12 +15,12 @@ import dotenv from "dotenv";
 dotenv.config();
 
 interface IMessage {
-    message_id: number;
+    id: number;
     text: string;
     date: string;
     dialog_id: number;
-    sender_id: number;
-    isread: boolean;
+    senderId: number;
+    isRead: boolean;
     files: Omit<IFile, "id" | "message_id">[];
     repliedMessage: number | null;
 }
@@ -38,12 +38,12 @@ class DialogsController {
 
 			if ((text || req.files) && opponentId && opponentId !== userId) {
 				const message: IMessage = {
-					message_id: 0,
+					id: 0,
 					text: text || "",
 					date: moment(Date.now()).format("DD:MM:YYYY HH:mm:ss"),
 					dialog_id: 0,
-					sender_id: Number(userId),
-					isread: false,
+					senderId: Number(userId),
+					isRead: false,
 					files: [],
 					repliedMessage: null
 				};
@@ -111,7 +111,7 @@ class DialogsController {
 					`INSERT INTO dialogs_messages (text, date, dialog_id, sender_id, reply_message_id) 
                     VALUES ($1, $2, $3, $4, $5) 
                     RETURNING id, text, date, dialog_id, sender_id, reply_message_id`,
-					[text, message.date, Number(message.dialog_id), Number(message.sender_id), replyMessageId]
+					[text, message.date, Number(message.dialog_id), Number(message.senderId), replyMessageId]
 				);
 
 				//Создаем файлы в бд
@@ -133,7 +133,7 @@ class DialogsController {
 					message.files = createdFiles;
 				}
 
-				message.message_id = createdMessage.rows[0].id;
+				message.id = createdMessage.rows[0].id;
 
 				if (createdMessage.rows.length === 0) {
 					await client.query("ROLLBACK");
@@ -437,11 +437,11 @@ class DialogsController {
 				const baseCTE = `
                     WITH full_data AS (
                         SELECT 
-                            m.id AS message_id,
-                            m.is_read AS isread,
+                            m.id AS id,
+                            m.is_read AS "isRead",
                             m.text,
                             m.date,
-                            m.sender_id,
+                            m.sender_id AS "senderId",
                             TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
                             COALESCE(
                                 json_agg(
@@ -479,24 +479,24 @@ class DialogsController {
                     
 					messagesQuery = baseCTE + `
                         , target_rn AS (
-                            SELECT rn FROM full_data WHERE message_id = $2
+                            SELECT rn FROM full_data WHERE id = $2
                         )
-                        SELECT message_id, isread, text, date, sender_id, files, "repliedMessage"
+                        SELECT id, "isRead", text, date, "senderId", files, "repliedMessage"
                         FROM full_data
                         WHERE ${rangeCondition}
-                        ORDER BY ts ASC, message_id ASC
+                        ORDER BY ts ASC, id ASC
                     `;
 					queryParams = [dialogId, messageId];
 				} else {
 					// Последние 10 сообщений
 					messagesQuery = baseCTE + `
-                        SELECT message_id, isread, text, date, sender_id, files, "repliedMessage"
+                        SELECT id, "isRead", text, date, "senderId", files, "repliedMessage"
                         FROM (
                             SELECT * FROM full_data
                             ORDER BY ts DESC
                             LIMIT 10
                         ) last_page
-                        ORDER BY ts ASC, message_id ASC
+                        ORDER BY ts ASC, id ASC
                     `;
 					queryParams = [dialogId];
 				}
@@ -540,8 +540,8 @@ class DialogsController {
 				const dialogs = await db.query(
 					`SELECT json_agg(
                         json_build_object(
-                            'dialog_id', sub.dialog_id,
-                            'last_message', json_build_object(
+                            'id', sub.dialog_id,
+                            'lastMessage', json_build_object(
                                 'id', sub.id,
                                 'text', sub.text,
                                 'date', sub.date
@@ -799,11 +799,11 @@ class DialogsController {
 					const query = `
                         WITH full_data AS (
                             SELECT 
-                                m.id AS message_id,
-                                m.is_read AS isread,
+                                m.id,
+                                m.is_read AS "isRead",
                                 m.text,
                                 m.date,
-                                m.sender_id,
+                                m.sender_id as "senderId",
                                 TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
                                 COALESCE(
                                     json_agg(
@@ -829,17 +829,27 @@ class DialogsController {
                                 rm.id, rm.text, rm.sender_id
                         ),
                         target_rn AS (
-                            SELECT rn FROM full_data WHERE message_id = $2
+                            SELECT rn FROM full_data WHERE id = $2
                         )
-                        SELECT message_id, isread, text, date, sender_id, files, "repliedMessage"
+                        SELECT id, "isRead", text, date, "senderId", files, "repliedMessage"
                         FROM full_data
                         WHERE rn BETWEEN (SELECT rn FROM target_rn) - 11 AND (SELECT rn FROM target_rn) + 11
-                        ORDER BY ts ASC, message_id ASC
+                        ORDER BY ts ASC, id ASC
                     `;
 
 					const result = await db.query(query, [dialogId, messageId]);
-
-					res.status(200).json({ message: "Сообщения успешно получены", messages: result.rows });
+					const modifiedResult = result.rows.map(row => {
+						return {
+							...row,
+							files: row.files.map((file: IFile) => {
+								return {
+									...file,
+									url: `${ process.env.HOST_URL }${file.url}`
+								};
+							})
+						};
+					});
+					res.status(200).json({ message: "Сообщения успешно получены", messages: modifiedResult });
 					return;
 				}
 			}

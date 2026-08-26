@@ -388,10 +388,10 @@ class ChatController {
 				// Общая часть запроса (без CTE, только основной SELECT)
 				const baseQuery = `
 					SELECT
-						cm.id as "message_id",
+						cm.id as "id",
 						cm.text,
 						cm.date,
-						cm.is_read AS "isread",
+						cm.is_read AS "isRead",
 						json_build_object(
 							'id', u.id,
 							'name', u."name",
@@ -402,7 +402,7 @@ class ChatController {
 							json_build_object(
 								'id', cm1.id,
 								'text', cm1."text",
-								'senderId', json_build_object(
+								'sender', json_build_object(
 									'id', repliedMessageSenderInfo."id",
 									'name', repliedMessageSenderInfo."name",
 									'surname', repliedMessageSenderInfo."surname",
@@ -499,14 +499,14 @@ class ChatController {
 				const chatsSelectResult = await db.query(
 					`
 						SELECT
-							chats.id as "chat_id",
+							chats.id as "id",
 							chats.name,
 							chats.image,
 							json_build_object(
 								'id', last_msg.id,
 								'text', last_msg.text,
 								'date', last_msg.date
-							) AS last_message
+							) AS "lastMessage"
 						FROM chats
 						JOIN chats_members ON chats_members.chat_id = chats.id AND chats_members.user_id = $1
 						LEFT JOIN LATERAL (
