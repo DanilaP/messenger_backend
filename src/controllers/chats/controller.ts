@@ -115,6 +115,7 @@ class ChatController {
 			await client.query("ROLLBACK");
 			console.error("Ошибка создания чата:", error);
 			res.status(500).json({ message: "Ошибка создания чата" });
+			return;
 		} 
 		finally {
 			client.release();
@@ -1028,6 +1029,38 @@ class ChatController {
 			console.log(error);
 			return;
 		}
+	}
+	static async getChatsInvitations(req: Request, res: Response) {
+		try {
+			const userId = userHelpers.getUserIdFromToken(req);
+			const insertResult = await db.query(
+				`
+                    select 
+						chats_invitations.id,
+						json_build_object(
+							'id', chats_invitations.chat_id,
+							'name', chats.name,
+							'description', chats.description,
+							'image', chats.image
+						) AS chatInfo,
+						COUNT(chats_members.chat_id) as "membersCount"
+					from chats_invitations
+					join users on users.id = chats_invitations.user_id 
+					join chats on chats.id = chats_invitations.chat_id 
+					join chats_members on chats.id = chats_members.chat_id 
+					where chats_invitations.user_id = $1
+					group by chats_invitations.id, chats.name, chats.description, chats.image
+                `,
+				[userId]
+			);
+			res.status(200).json({ message: "Ошибка получения приглашений в чаты:", invitations: insertResult.rows });
+			return;
+		} 
+		catch (error) {
+			console.error("Ошибка получения приглашений в чаты:", error);
+			res.status(500).json({ message: "Ошибка получения приглашений в чаты:" });
+			return;
+		} 
 	}
 }
 

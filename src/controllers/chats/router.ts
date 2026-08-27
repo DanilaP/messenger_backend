@@ -5,6 +5,7 @@ const router = Router();
 router.get("/", ChatController.getChats);
 router.post("/", ChatController.createChat);
 router.patch("/", ChatController.changeChatInfo);
+router.get("/invitations", ChatController.getChatsInvitations);
 router.delete("/members", ChatController.removeMemberFromChat);
 router.patch("/avatar", ChatController.changeChatAvatar);
 router.post("/send-invitation", ChatController.sendInvitationToChat);
