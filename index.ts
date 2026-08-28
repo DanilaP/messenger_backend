@@ -1,5 +1,5 @@
 import { initWebSocket } from "./src/websocket/websocket";
-import { checkFileAccess } from "./src/middlewares/static-middleware";
+import { checkChatFileAccess, checkDialogFileAccess } from "./src/middlewares/static-middleware";
 import express from "express";
 import fileUpload from "express-fileupload";
 import http from "http";
@@ -37,9 +37,20 @@ app.use("/files", express.static(path.join(__dirname, "static/files")));
 app.use("/publications", express.static(path.join(__dirname, "static/publications")));
 
 // Защищённая статика – файлы диалогов
-app.get("/dialogs-files/:dialogId/:filename", checkFileAccess, (req, res) => {
+app.get("/dialogs-files/:dialogId/:filename", checkDialogFileAccess, (req, res) => {
 	const { dialogId, filename } = req.params;
 	const filePath = path.join(__dirname, "static", "dialogs-files", dialogId, filename);
+	res.sendFile(filePath, (err) => {
+		if (err) {
+			res.status(404).send("File not found");
+		}
+	});
+});
+
+// Защищённая статика – файлы чатов (и avatar, и files)
+app.get("/chat-files/:chatId/:subfolder/:filename", checkChatFileAccess, (req, res) => {
+	const { chatId, subfolder, filename } = req.params;
+	const filePath = path.join(__dirname, "static", "chat-files", chatId, subfolder, filename);
 	res.sendFile(filePath, (err) => {
 		if (err) {
 			res.status(404).send("File not found");

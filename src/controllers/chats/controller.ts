@@ -526,7 +526,15 @@ class ChatController {
 					`,
 					[userId]
 				);
-				res.status(200).json({ message: "Успешное получение информации о чатах", chats: chatsSelectResult.rows });
+				res.status(200).json({ 
+					message: "Успешное получение информации о чатах", 
+					chats: chatsSelectResult.rows.map(chat => {
+						return {
+							...chat,
+							image: `${ process.env.HOST_URL }${chat.image}`
+						};
+					})
+				});
 				return;	
 			}
 		} 
