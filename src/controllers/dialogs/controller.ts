@@ -581,15 +581,19 @@ class DialogsController {
                     `,
 					[userId]
 				);
-				const modifiedDialogs = dialogs.rows[0].result.map((dialog: any) => {
-					return {
-						...dialog,
-						opponent: {
-							...dialog.opponent,
-							avatar: `${ process.env.HOST_URL }${dialog.opponent.avatar}`
-						}
-					};
-				});
+
+				let modifiedDialogs = [];
+				if (dialogs.rows[0].result) {
+					modifiedDialogs = dialogs.rows[0].result.map((dialog: any) => {
+						return {
+							...dialog,
+							opponent: {
+								...dialog.opponent,
+								avatar: `${ process.env.HOST_URL }${dialog.opponent.avatar}`
+							}
+						};
+					});
+				}
 				res.status(200).json({ message: "Список диалогов успешно получен", dialogs: modifiedDialogs });
 				return;
 			}
