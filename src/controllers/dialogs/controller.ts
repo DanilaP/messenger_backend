@@ -18,7 +18,7 @@ interface IMessage {
     id: number;
     text: string;
     date: string;
-    dialog_id: number;
+    dialogId: number;
     senderId: number;
     isRead: boolean;
     files: Omit<IFile, "id" | "message_id">[];
@@ -41,7 +41,7 @@ class DialogsController {
 					id: 0,
 					text: text || "",
 					date: moment(Date.now()).format("DD:MM:YYYY HH:mm:ss"),
-					dialog_id: 0,
+					dialogId: 0,
 					senderId: Number(userId),
 					isRead: false,
 					files: [],
@@ -71,7 +71,7 @@ class DialogsController {
 
 				// Диалог уже есть - используем его id
 				if (existingDialog.rows.length > 0) {
-					message.dialog_id = existingDialog.rows[0].dialog_id;
+					message.dialogId = existingDialog.rows[0].dialog_id;
 				} 
 				// Если диалога еще нет
 				else {
@@ -97,13 +97,13 @@ class DialogsController {
 						return;
 					}
 
-					message.dialog_id = createdDialog.rows[0].id;
+					message.dialogId = createdDialog.rows[0].id;
 				}
                 
 				//Создаем файлы в статике
 				if (req.files) {
 					message.files = 
-                        req.files ? (await fsHelpers.uploadFiles(req.files, `/dialogs-files/${message.dialog_id}`)).filelist : [];
+                        req.files ? (await fsHelpers.uploadFiles(req.files, `/dialogs-files/${message.dialogId}`)).filelist : [];
 				}
 
 				//Добавляем в бд сообщение
@@ -111,7 +111,7 @@ class DialogsController {
 					`INSERT INTO dialogs_messages (text, date, dialog_id, sender_id, reply_message_id) 
                     VALUES ($1, $2, $3, $4, $5) 
                     RETURNING id, text, date, dialog_id, sender_id, reply_message_id`,
-					[text, message.date, Number(message.dialog_id), Number(message.senderId), replyMessageId]
+					[text, message.date, Number(message.dialogId), Number(message.senderId), replyMessageId]
 				);
 
 				//Создаем файлы в бд
@@ -150,7 +150,7 @@ class DialogsController {
 
 				broadcastMessage([opponentId], {
 					type: "new_message_dialog",
-					dialogId: message.dialog_id,
+					dialogId: message.dialogId,
 					message: message,
 					senderInfo: senderInfo.rows[0]
 				});
@@ -160,12 +160,18 @@ class DialogsController {
 						`SELECT id, text, sender_id as "senderId" 
                         FROM dialogs_messages 
                         WHERE dialog_id = $1 AND id = $2 FOR UPDATE`,
-						[Number(message.dialog_id), Number(replyMessageId)]
+						[Number(message.dialogId), Number(replyMessageId)]
 					);
 					message.repliedMessage = repliedMessageInfo.rows[0];
 				}
 
-				res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: message });
+				const { dialogId, ...modifiedMessageObject } = message;
+
+				res.status(200).json({ 
+					message: "Сообщение успешно отправлено", 
+					createdMessage: modifiedMessageObject
+				});
+				
 				return;
 			}
 			await client.query("ROLLBACK");
