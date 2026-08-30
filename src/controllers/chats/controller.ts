@@ -776,7 +776,7 @@ class ChatController {
 			const userId = userHelpers.getUserIdFromToken(req);
 
 			const modifiedMessageInfo: { id: number, text: string, files: Partial<IFile>[] } = {
-				id: messageId,
+				id: Number(messageId),
 				text: text,
 				files: []
 			};
