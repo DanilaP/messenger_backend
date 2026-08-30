@@ -383,6 +383,20 @@ class ChatController {
 			const userId = userHelpers.getUserIdFromToken(req);
 			const chatId = Number(req.query.chatId) || null;
 			const targetMessageId = Number(req.query.targetMessageId) || null;
+			const chatBaseInfo = await db.query(
+				`
+					select 
+						name, 
+						image, 
+						description,
+						count(chats_members.user_id) as membersCount
+					from chats 
+					join chats_members on chats_members.chat_id = chats.id
+					where chats.id = $1
+					group by chats.name, chats.image, chats.description  
+				`,
+				[chatId]
+			);
 
 			//Получение детальной информации о конкретном чате
 			if (chatId) {
@@ -490,6 +504,7 @@ class ChatController {
 					message: "Успешное получение информации о чате",
 					chat: {
 						id: chatId,
+						...chatBaseInfo.rows[0],
 						messages: chatSelectResult.rows
 					}
 				});
