@@ -557,9 +557,9 @@ class ChatController {
 				id: 0,
 				text: text || "",
 				date: moment(Date.now()).format("DD:MM:YYYY HH:mm:ss"),
-				chat_id: Number(chatId),
-				sender_id: Number(userId),
-				is_read: false,
+				chatId: Number(chatId),
+				senderId: Number(userId),
+				isRead: false,
 				files: [] as IFile[],
 				repliedMessage: null
 			};
@@ -584,9 +584,9 @@ class ChatController {
 					[
 						message.text, 
 						message.date, 
-						message.chat_id, 
-						message.sender_id, 
-						message.is_read, 
+						message.chatId, 
+						message.senderId, 
+						message.isRead, 
 						Number(replyMessageId) || null
 					]
 				);
@@ -603,7 +603,7 @@ class ChatController {
 				if (files) {
 					//Сохраняем файлы в статику
 					const savedFilesInfo = 
-						(await (fsHelpers.uploadFiles(files, `/chat-files/${message.chat_id}/files`))).filelist || [];
+						(await (fsHelpers.uploadFiles(files, `/chat-files/${message.chatId}/files`))).filelist || [];
 					message.files = savedFilesInfo;
 
 					//Сохраняем информацию о файлах в бд
@@ -634,7 +634,7 @@ class ChatController {
 					),
 					db.query(
 						"SELECT user_id FROM chats_members WHERE chats_members.chat_id = $1",
-						[message.chat_id]
+						[message.chatId]
 					)
 				]);
 
@@ -645,20 +645,22 @@ class ChatController {
 							FROM chats_messages 
 							WHERE chat_id = $1 AND id = $2 FOR UPDATE
 						`,
-						[Number(message.chat_id), (Number(replyMessageId) || null)]
+						[Number(message.chatId), (Number(replyMessageId) || null)]
 					);
 					message.repliedMessage = repliedMessageInfo.rows[0];
 				}
 
 				broadcastMessage(chatMembersIds.rows.map(el => el.user_id), {
 					type: "new_message_dialog",
-					dialogId: message.chat_id,
+					dialogId: message.chatId,
 					message: message,
 					senderInfo: senderInfo.rows[0]
 				});
-				
+
+				const { chatId: _, ...modifiedMessageInfo } = message;
+
 				await client.query("COMMIT");
-				res.status(200).json({ message: "Сообщение успешно отправлено" });
+				res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: modifiedMessageInfo });
 				return;
 			}
 

@@ -27,7 +27,7 @@ export async function insertFilesToChatsFiles(client: PoolClient, files: Omit<IC
                 $4::text[],
                 $5::int[]
             )
-            RETURNING id, name, url, size, type, message_id
+            RETURNING name, url, size, type
         `,
 		[names, urls, sizes, types, messageIds]
 	);
