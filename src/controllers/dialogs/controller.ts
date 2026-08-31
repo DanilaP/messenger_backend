@@ -20,6 +20,12 @@ interface IMessage {
     date: string;
     dialogId: number;
     senderId: number;
+	sender: {
+		id: number,
+		name: string,
+		surname: string,
+		avatar: string
+	} | null;
     isRead: boolean;
     files: Omit<IFile, "id" | "message_id">[];
     repliedMessage: number | null;
@@ -43,6 +49,7 @@ class DialogsController {
 					date: moment(Date.now()).format("DD:MM:YYYY HH:mm:ss"),
 					dialogId: 0,
 					senderId: Number(userId),
+					sender: null,
 					isRead: false,
 					files: [],
 					repliedMessage: null
@@ -59,6 +66,13 @@ class DialogsController {
 					res.status(400).json({ message: "Указанный оппонент не существует" });
 					return;
 				}
+
+				const senderInfoSelectResult = await client.query(
+					"SELECT id, name, surname, avatar FROM users WHERE id = $1",
+					[message.senderId]
+				);
+
+				message.sender = senderInfoSelectResult.rows[0];
 
 				// Проверяем, существует ли уже диалог между пользователями
 				const existingDialog = await client.query<{ dialog_id: number }>(
@@ -165,7 +179,7 @@ class DialogsController {
 					message.repliedMessage = repliedMessageInfo.rows[0];
 				}
 
-				const { dialogId, ...modifiedMessageObject } = message;
+				const { dialogId, senderId, ...modifiedMessageObject } = message;
 
 				res.status(200).json({ 
 					message: "Сообщение успешно отправлено", 
@@ -809,43 +823,49 @@ class DialogsController {
 				else {
 					const query = `
                         WITH full_data AS (
-                            SELECT 
-                                m.id,
-                                m.is_read AS "isRead",
-                                m.text,
-                                m.date,
-                                m.sender_id as "senderId",
-                                TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
-                                COALESCE(
-                                    json_agg(
-                                        json_build_object('name', f.name, 'size', f.size, 'type', f.type, 'url', f.url)
-                                        ORDER BY f.id
-                                    ) FILTER (WHERE f.id IS NOT NULL),
-                                    '[]'::json
-                                ) AS files,
-                                CASE WHEN m.reply_message_id IS NOT NULL THEN
-                                    json_build_object(
-                                        'id', rm.id,
-                                        'text', rm.text,
-                                        'senderId', rm.sender_id
-                                    )
-                                ELSE NULL END AS "repliedMessage",
-                                ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
-                            FROM dialogs_messages m
-                            LEFT JOIN dialogs_files f ON f.message_id = m.id
-                            LEFT JOIN dialogs_messages rm ON rm.id = m.reply_message_id
-                            WHERE m.dialog_id = $1
-                            GROUP BY 
-                                m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
-                                rm.id, rm.text, rm.sender_id
-                        ),
-                        target_rn AS (
-                            SELECT rn FROM full_data WHERE id = $2
-                        )
-                        SELECT id, "isRead", text, date, "senderId", files, "repliedMessage"
-                        FROM full_data
-                        WHERE rn BETWEEN (SELECT rn FROM target_rn) - 11 AND (SELECT rn FROM target_rn) + 11
-                        ORDER BY ts ASC, id ASC
+							SELECT 
+								m.id,
+								m.is_read AS "isRead",
+								m.text,
+								m.date,
+								json_build_object(
+									'id', u.id,
+									'name', u.name,
+									'surname', u.surname,
+									'avatar', u.avatar
+								) as sender,
+								TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
+								COALESCE(
+									json_agg(
+										json_build_object('name', f.name, 'size', f.size, 'type', f.type, 'url', f.url)
+										ORDER BY f.id
+									) FILTER (WHERE f.id IS NOT NULL),
+									'[]'::json
+								) AS files,
+								CASE WHEN m.reply_message_id IS NOT NULL THEN
+									json_build_object(
+										'id', rm.id,
+										'text', rm.text,
+										'senderId', rm.sender_id
+									)
+								ELSE NULL END AS "repliedMessage",
+								ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
+							FROM dialogs_messages m
+							LEFT JOIN dialogs_files f ON f.message_id = m.id
+							LEFT JOIN dialogs_messages rm ON rm.id = m.reply_message_id
+							JOIN users u ON u.id = m.sender_id 
+							WHERE m.dialog_id = $1
+							GROUP BY 
+								m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
+								rm.id, rm.text, rm.sender_id, u.id
+						),
+						target_rn AS (
+							SELECT rn FROM full_data WHERE id = $2
+						)
+						SELECT id, "isRead", text, date, sender, files, "repliedMessage"
+						FROM full_data
+						WHERE rn BETWEEN (SELECT rn FROM target_rn) - 11 AND (SELECT rn FROM target_rn) + 11
+						ORDER BY ts ASC, id ASC
                     `;
 
 					const result = await db.query(query, [dialogId, messageId]);
