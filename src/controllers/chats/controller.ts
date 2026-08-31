@@ -387,13 +387,9 @@ class ChatController {
 				`
 					select 
 						name, 
-						image, 
-						description,
-						count(chats_members.user_id) as membersCount
+						image
 					from chats 
-					join chats_members on chats_members.chat_id = chats.id
 					where chats.id = $1
-					group by chats.name, chats.image, chats.description  
 				`,
 				[chatId]
 			);
@@ -763,7 +759,7 @@ class ChatController {
 				});
 
 				await client.query("COMMIT");
-				res.status(200).json({ message: "Сообщение успешно удалено" });
+				res.status(200).json({ message: "Сообщения успешно удалены" });
 				return;
 			}
 
@@ -774,8 +770,8 @@ class ChatController {
 		catch (error) {
 			await client.query("ROLLBACK");
 
-			console.error("Ошибка при удалении сообщения", error);
-			res.status(500).json({ message: "Ошибка при удалении сообщения" });
+			console.error("Ошибка при удалении сообщений", error);
+			res.status(500).json({ message: "Ошибка при удалении сообщений" });
 			return;
 		} 
 		finally {

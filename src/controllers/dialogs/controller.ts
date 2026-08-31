@@ -443,34 +443,35 @@ class DialogsController {
 				const baseCTE = `
                     WITH full_data AS (
                         SELECT 
-                            m.id AS id,
-                            m.is_read AS "isRead",
-                            m.text,
-                            m.date,
-                            m.sender_id AS "senderId",
-                            TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
-                            COALESCE(
-                                json_agg(
-                                    json_build_object('name', f.name, 'size', f.size, 'type', f.type, 'url', f.url)
-                                    ORDER BY f.id
-                                ) FILTER (WHERE f.id IS NOT NULL),
-                                '[]'::json
-                            ) AS files,
-                            CASE WHEN m.reply_message_id IS NOT NULL THEN
-                                json_build_object(
-                                    'id', rm.id,
-                                    'text', rm.text,
-                                    'senderId', rm.sender_id
-                                )
-                            ELSE NULL END AS "repliedMessage",
-                            ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
-                        FROM dialogs_messages m
-                        LEFT JOIN dialogs_files f ON f.message_id = m.id
-                        LEFT JOIN dialogs_messages rm ON rm.id = m.reply_message_id
-                        WHERE m.dialog_id = $1
-                        GROUP BY 
-                            m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
-                            rm.id, rm.text, rm.sender_id
+							m.id AS id,
+							m.is_read AS "isRead",
+							m.text,
+							m.date,
+							json_build_object('id', u.id , 'name', u."name" , 'surname', u.surname , 'avatar', u.avatar) as sender,
+							TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS') AS ts,
+							COALESCE(
+								json_agg(
+									json_build_object('name', f.name, 'size', f.size, 'type', f.type, 'url', f.url)
+									ORDER BY f.id
+								) FILTER (WHERE f.id IS NOT NULL),
+								'[]'::json
+							) AS files,
+							CASE WHEN m.reply_message_id IS NOT NULL THEN
+								json_build_object(
+									'id', rm.id,
+									'text', rm.text,
+									'senderId', rm.sender_id
+								)
+							ELSE NULL END AS "repliedMessage",
+							ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
+						FROM dialogs_messages m
+						LEFT JOIN dialogs_files f ON f.message_id = m.id
+						LEFT JOIN dialogs_messages rm ON rm.id = m.reply_message_id
+						JOIN users u ON u.id = m.sender_id 
+						WHERE m.dialog_id = $1
+						GROUP BY 
+							m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
+							rm.id, rm.text, rm.sender_id, u.id
                     )
                 `;
 
@@ -487,7 +488,7 @@ class DialogsController {
                         , target_rn AS (
                             SELECT rn FROM full_data WHERE id = $2
                         )
-                        SELECT id, "isRead", text, date, "senderId", files, "repliedMessage"
+                        SELECT id, "isRead", text, date, sender, files, "repliedMessage"
                         FROM full_data
                         WHERE ${rangeCondition}
                         ORDER BY ts ASC, id ASC
@@ -496,7 +497,7 @@ class DialogsController {
 				} else {
 					// Последние 10 сообщений
 					messagesQuery = baseCTE + `
-                        SELECT id, "isRead", text, date, "senderId", files, "repliedMessage"
+                        SELECT id, "isRead", text, date, sender, files, "repliedMessage"
                         FROM (
                             SELECT * FROM full_data
                             ORDER BY ts DESC
