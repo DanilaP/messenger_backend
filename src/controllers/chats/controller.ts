@@ -383,6 +383,8 @@ class ChatController {
 			const userId = userHelpers.getUserIdFromToken(req);
 			const chatId = Number(req.query.chatId) || null;
 			const targetMessageId = Number(req.query.targetMessageId) || null;
+			const mode = req.query.mode;
+
 			const chatBaseInfo = await db.query(
 				`
 					select 
@@ -396,6 +398,10 @@ class ChatController {
 
 			//Получение детальной информации о конкретном чате
 			if (chatId) {
+				if (!await checkChatMember(chatId, userId)) {
+					res.status(403).json({ message: "Forbidden" });
+					return;
+				}
 				// Общая часть запроса (без CTE, только основной SELECT)
 				const baseQuery = `
 					SELECT
@@ -446,40 +452,23 @@ class ChatController {
 				let queryText, queryParams;
 
 				if (targetMessageId) {
-					// Вариант с целевым сообщением (10 до + 10 после)
+					// Определяем направление: mode === 'next' → следующие 10, иначе предыдущие 10
+					const isNext = mode === "next";
+					const comparison = isNext ? ">" : "<";
+					const orderDir = isNext ? "ASC" : "DESC";
+
 					queryText = `
-						WITH
-						target AS (
-							SELECT id, chat_id
-							FROM chats_messages
-							WHERE id = $1
-						),
-						previous AS (
+						WITH selected_ids AS (
 							SELECT id
 							FROM chats_messages
-							WHERE chat_id = (SELECT chat_id FROM target)
-							AND id < (SELECT id FROM target)
-							ORDER BY id DESC
+							WHERE chat_id = $2
+							AND id ${comparison} $1
+							ORDER BY id ${orderDir}
 							LIMIT 10
-						),
-						next AS (
-							SELECT id
-							FROM chats_messages
-							WHERE chat_id = (SELECT chat_id FROM target)
-							AND id > (SELECT id FROM target)
-							ORDER BY id ASC
-							LIMIT 10
-						),
-						selected_ids AS (
-							SELECT id FROM target
-							UNION
-							SELECT id FROM previous
-							UNION
-							SELECT id FROM next
 						)
 						${baseQuery}
 					`;
-					queryParams = [targetMessageId];
+					queryParams = [targetMessageId, chatId];
 				} else {
 					// Вариант без целевого – последние 10 сообщений чата
 					queryText = `
