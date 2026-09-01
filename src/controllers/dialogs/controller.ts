@@ -474,18 +474,24 @@ class DialogsController {
 								json_build_object(
 									'id', rm.id,
 									'text', rm.text,
-									'senderId', rm.sender_id
+									'sender', json_build_object(
+										'id', reply_user.id,
+										'name', reply_user.name,
+										'surname', reply_user.surname,
+										'avatar', reply_user.avatar
+									)
 								)
 							ELSE NULL END AS "repliedMessage",
 							ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
 						FROM dialogs_messages m
 						LEFT JOIN dialogs_files f ON f.message_id = m.id
 						LEFT JOIN dialogs_messages rm ON rm.id = m.reply_message_id
+						LEFT JOIN users reply_user ON reply_user.id = rm.sender_id
 						JOIN users u ON u.id = m.sender_id 
 						WHERE m.dialog_id = $1
 						GROUP BY 
 							m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
-							rm.id, rm.text, rm.sender_id, u.id
+							rm.id, rm.text, rm.sender_id, u.id, reply_user.id
                     )
                 `;
 
@@ -527,10 +533,21 @@ class DialogsController {
 				const isMember = await checkMember(userId, dialogId);
 
 				if (isMember) {
-					//Заменяем url на корректный для всех файлов
+					//Заменяем url на корректный для всех ссылок
 					const modifiedMessages = dialog.rows.map(message => {
 						return {
 							...message,
+							sender: {
+								...message.sender,
+								avatar: `${ process.env.HOST_URL }${message.sender.avatar}`
+							},
+							repliedMessage: message.repliedMessage && {
+								...message.repliedMessage,
+								sender: {
+									...message.repliedMessage.sender,
+									avatar: `${ process.env.HOST_URL }${message.repliedMessage.sender.avatar}`
+								},
+							},
 							files: message.files.map((file: IFile) => {
 								return {
 									...file,
@@ -539,6 +556,7 @@ class DialogsController {
 							})
 						};
 					});
+
 					res.status(200).json({ 
 						message: "Успешное получение информации о диалоге", 
 						dialog: {
