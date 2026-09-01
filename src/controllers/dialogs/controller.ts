@@ -171,9 +171,21 @@ class DialogsController {
 
 				if (replyMessageId !== null) {
 					const repliedMessageInfo = await client.query(
-						`SELECT id, text, sender_id as "senderId" 
-                        FROM dialogs_messages 
-                        WHERE dialog_id = $1 AND id = $2 FOR UPDATE`,
+						`
+							SELECT 
+								dialogs_messages.id, 
+								dialogs_messages.text, 
+								json_build_object(
+									'id', users.id,
+									'name', users.name,
+									'surname', users.surname,
+									'avatar', users.avatar
+								) as sender 
+							FROM dialogs_messages 
+							join dialogs_messages dm on dm.id = dialogs_messages.reply_message_id 
+							join users on users.id = dm.sender_id 
+							WHERE dialogs_messages.dialog_id = $1 AND dialogs_messages.id = $2
+						`,
 						[Number(message.dialogId), Number(replyMessageId)]
 					);
 					message.repliedMessage = repliedMessageInfo.rows[0];
