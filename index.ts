@@ -39,7 +39,7 @@ app.use("/publications", express.static(path.join(__dirname, "static/publication
 // Защищённая статика – файлы диалогов
 app.get("/dialogs-files/:dialogId/:filename", checkDialogFileAccess, (req, res) => {
 	const { dialogId, filename } = req.params;
-	const filePath = path.join(__dirname, "static", "dialogs-files", dialogId, filename);
+	const filePath = path.join(__dirname, "static", "dialogs-files", dialogId as string, filename as string);
 	res.sendFile(filePath, (err) => {
 		if (err) {
 			res.status(404).send("File not found");
@@ -50,7 +50,7 @@ app.get("/dialogs-files/:dialogId/:filename", checkDialogFileAccess, (req, res) 
 // Защищённая статика – файлы чатов (и avatar, и files)
 app.get("/chat-files/:chatId/:subfolder/:filename", checkChatFileAccess, (req, res) => {
 	const { chatId, subfolder, filename } = req.params;
-	const filePath = path.join(__dirname, "static", "chat-files", chatId, subfolder, filename);
+	const filePath = path.join(__dirname, "static", "chat-files", chatId as string, subfolder as string, filename as string);
 	res.sendFile(filePath, (err) => {
 		if (err) {
 			res.status(404).send("File not found");

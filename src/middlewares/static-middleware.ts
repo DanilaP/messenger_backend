@@ -11,7 +11,7 @@ const checkUserAccessToDialog = async (userId: number, dialogId: number): Promis
 export const checkDialogFileAccess = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
 	try {
 		const userId = userHelpers.getUserIdFromToken(req);
-		const dialogId = parseInt(req.params.dialogId, 10);
+		const dialogId = parseInt(req.params.dialogId as string, 10);
 
 		if (isNaN(dialogId)) {
 			res.status(400).send("Invalid dialog ID");
@@ -35,7 +35,7 @@ export const checkDialogFileAccess = async (req: Request, res: Response, next: N
 export const checkChatFileAccess = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
 	try {
 		const userId = userHelpers.getUserIdFromToken(req);
-		const chatId = parseInt(req.params.chatId, 10);
+		const chatId = parseInt(req.params.chatId as string, 10);
 
 		if (isNaN(chatId)) {
 			res.status(400).send("Invalid dialog ID");
