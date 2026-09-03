@@ -69,7 +69,6 @@ export const initWebSocket = (server: any) => {
 			});
             
 		} catch (error) {
-			console.error("Ошибка при подключении WebSocket:", error);
 			ws.close(1008, "Не авторизован");
 		}
 	});

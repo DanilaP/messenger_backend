@@ -46,6 +46,7 @@ class AuthController {
 				}
 				catch(error: any) {
 					if (error.code === "23505") { 
+						console.error(error);
 						res.status(400).json({ message: "Пользователь с таким логином уже существует" });
 						return;
 					}
