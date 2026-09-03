@@ -11,7 +11,7 @@ class AuthController {
 	static async registration(req: Request, res: Response) {
 		try {
 			const { login, password, name, surname, lastname } = req.body;
-			const avatar = `/files/avatar.jpg`;
+			const avatar = `/files/avatar.png`;
 
 			if (
 				validateEmail(login) && 

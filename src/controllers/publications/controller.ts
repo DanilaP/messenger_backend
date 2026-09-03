@@ -15,13 +15,12 @@ class PublicationsController {
 					select 
 						publications.id,
 						user_id as "userId", 
-						to_char(date, 'DD.MM.YYYY') as date,
+						to_char(date::date, 'DD.MM.YYYY') AS date,
 						text,
-						archived,
 						json_build_object('url', url, 'size', size, 'type', type) as file
 					from publications
 					join publications_files on publications_files.publication_id = publications.id 
-					where user_id = $1    
+					where user_id = $1
 					`,
 				[userId]
 			);
