@@ -16,6 +16,32 @@ import userHelpers from "../../helpers/user-helpers";
 import dotenv from "dotenv";
 dotenv.config();
 
+interface IMessage {
+	id: number;
+	text: string;
+	date: string;
+	chatId: number;
+	senderId: number;
+	sender: {
+		id: number,
+		name: string,
+		surname: string,
+		avatar: string
+	} | null;
+	isRead: boolean;
+	files: Omit<IFile, "id" | "message_id">[];
+	repliedMessage: {
+		id: number,
+		text: string,
+		sender: {
+			id: number,
+			name: string,
+			surname: string,
+			avatar: string
+		}
+	} | null;
+}
+
 class ChatController {
 	static async createChat(req: Request, res: Response) {
 		const client = await db.getClient();
@@ -25,6 +51,7 @@ class ChatController {
 
 			const userId = userHelpers.getUserIdFromToken(req);
 			const { name, description } = req.body;
+			const chatOwnerRoleId = 1;
 
 			//Проверка наличия обязательных полей
 			if (!name || !description) {
@@ -91,10 +118,10 @@ class ChatController {
 			//Сохраняем информацию об участниках чата их ролях
 			const chatMembersInsertResult = await client.query(
 				`
-                    INSERT INTO chats_members (chat_id, user_id) 
-                    VALUES ($1, $2) 
+                    INSERT INTO chats_members (chat_id, user_id, role_id) 
+                    VALUES ($1, $2, $3) 
                 `,
-				[chat.id, userId]
+				[chat.id, userId, chatOwnerRoleId]
 			);
 
 			if (chatMembersInsertResult.rowCount === 0) {
@@ -553,12 +580,13 @@ class ChatController {
 			const files = req.files || null;
 			const { chatId, text, replyMessageId } = req.body;
 
-			const message = {
+			const message: IMessage = {
 				id: 0,
 				text: text || "",
 				date: moment(Date.now()).format("DD:MM:YYYY HH:mm:ss"),
 				chatId: Number(chatId),
 				senderId: Number(userId),
+				sender: null,
 				isRead: false,
 				files: [] as IFile[],
 				repliedMessage: null
@@ -638,14 +666,26 @@ class ChatController {
 					)
 				]);
 
-				if (replyMessageId !== null) {
+				message.sender = senderInfo.rows[0];
+
+				if (replyMessageId) {
 					repliedMessageInfo = await client.query(
 						`
-							SELECT id, text, sender_id as "senderId" 
+							SELECT 
+								chats_messages.id, 
+								chats_messages.text, 
+								json_build_object(
+									'id', users.id,
+									'name', users.name,
+									'surname', users.surname,
+									'avatar', users.avatar
+								) as sender 
 							FROM chats_messages 
-							WHERE chat_id = $1 AND id = $2 FOR UPDATE
+							join chats_messages cm on cm.id = $2 
+							join users on users.id = cm.sender_id 
+							WHERE chats_messages.chat_id = $1 AND chats_messages.id = $2
 						`,
-						[Number(message.chatId), (Number(replyMessageId) || null)]
+						[Number(message.chatId), Number(replyMessageId)]
 					);
 					message.repliedMessage = repliedMessageInfo.rows[0];
 				}
@@ -657,7 +697,7 @@ class ChatController {
 					senderInfo: senderInfo.rows[0]
 				});
 
-				const { chatId: _, ...modifiedMessageInfo } = message;
+				const { chatId: _, senderId, ...modifiedMessageInfo } = message;
 
 				await client.query("COMMIT");
 				res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: modifiedMessageInfo });
