@@ -28,7 +28,16 @@ interface IMessage {
 	} | null;
     isRead: boolean;
     files: Omit<IFile, "id" | "message_id">[];
-    repliedMessage: number | null;
+    repliedMessage: {
+		id: number,
+		text: string,
+		sender: {
+			id: number,
+			name: string,
+			surname: string,
+			avatar: string
+		}
+	} | null;
 }
 
 class DialogsController {
@@ -182,7 +191,7 @@ class DialogsController {
 									'avatar', users.avatar
 								) as sender 
 							FROM dialogs_messages 
-							join dialogs_messages dm on dm.id = dialogs_messages.reply_message_id 
+							join dialogs_messages dm on dm.id = $2 
 							join users on users.id = dm.sender_id 
 							WHERE dialogs_messages.dialog_id = $1 AND dialogs_messages.id = $2
 						`,
@@ -191,13 +200,31 @@ class DialogsController {
 					message.repliedMessage = repliedMessageInfo.rows[0];
 				}
 
-				const { dialogId, senderId, ...modifiedMessageObject } = message;
+				const { dialogId, senderId, ...modifiedMessageObject } = {
+					...message,
+					sender: {
+						...message.sender,
+						avatar: `${ process.env.HOST_URL }${message.sender?.avatar}`
+					},
+					files: message.files.map(file => {
+						return {
+							...file,
+							url: `${ process.env.HOST_URL }${file.url}`
+						};
+					}),
+					repliedMessage: {
+						...message.repliedMessage,
+						sender: {
+							...message.repliedMessage?.sender,
+							avatar: `${ process.env.HOST_URL }${message.repliedMessage?.sender.avatar}`
+						}
+					}
+				};
 
 				res.status(200).json({ 
 					message: "Сообщение успешно отправлено", 
 					createdMessage: modifiedMessageObject
 				});
-				
 				return;
 			}
 			await client.query("ROLLBACK");
