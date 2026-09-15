@@ -9,6 +9,8 @@ dotenv.config();
 
 class AuthController {
 	static async registration(req: Request, res: Response) {
+		const client = await db.getClient();
+
 		try {
 			const { login, password, name, surname, lastname } = req.body;
 			const avatar = `/files/avatar.png`;
@@ -23,17 +25,34 @@ class AuthController {
 				const hashedPassword = await bcrypt.hash(password, saltRounds);
 
 				try {
-					const result = await db.query<IUser>(
-						`INSERT INTO users (login, password, name, surname, lastname, avatar) 
-                        VALUES ($1, $2, $3, $4, $5, $6) 
-                        RETURNING id, login, name, surname, lastname, status, avatar`,
+					const inserted = await client.query<{ id: number }>(
+						`
+							INSERT INTO users (login, password, name, surname, lastname, avatar)
+							VALUES ($1, $2, $3, $4, $5, $6)
+							RETURNING id
+						`,
 						[login, hashedPassword, name, surname, lastname, avatar]
+					);
+
+					const newId = inserted.rows[0]?.id;
+					
+					if (!newId) {
+						throw new Error('INSERT did not return id');
+					}
+
+					const result = await client.query<IUser>(
+						`UPDATE users
+							SET username = id
+						WHERE id = $1
+						RETURNING id, login, username, name, surname, lastname, status, avatar`,
+						[newId]
 					);
 
 					if (result.rows[0]) {
 						const token = userHelpers.generateAccessToken(result.rows[0].id);
 						userHelpers.setTokenToTheResponse(res, token);
 
+						await client.query("COMMIT");
 						res.status(200).json({ 
 							message: "Успешная регистрация", 
 							user: {
@@ -46,6 +65,7 @@ class AuthController {
 				}
 				catch(error: any) {
 					if (error.code === "23505") { 
+						await client.query("ROLLBACK");
 						console.error(error);
 						res.status(400).json({ message: "Пользователь с таким логином уже существует" });
 						return;
@@ -53,7 +73,7 @@ class AuthController {
 					throw error;
 				}
 			}
-
+			await client.query("ROLLBACK");
 			res.status(400).json({ 
 				message: `
                     Ошибка при регистрации. 
@@ -63,9 +83,13 @@ class AuthController {
 			return;
 		}
 		catch (error) {
+			await client.query("ROLLBACK");
 			res.status(500).json({ message: "Ошибка при регистрации" });
 			console.log(error);
 			return;
+		}
+		finally {
+			client.release();
 		}
 	}
 	static async login(req: Request, res: Response) {
