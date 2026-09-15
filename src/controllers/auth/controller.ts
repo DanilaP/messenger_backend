@@ -37,7 +37,7 @@ class AuthController {
 					const newId = inserted.rows[0]?.id;
 					
 					if (!newId) {
-						throw new Error('INSERT did not return id');
+						throw new Error("INSERT did not return id");
 					}
 
 					const result = await client.query<IUser>(
