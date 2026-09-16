@@ -697,7 +697,26 @@ class ChatController {
 					senderInfo: senderInfo.rows[0]
 				});
 
-				const { chatId: _, senderId, ...modifiedMessageInfo } = message;
+				const { chatId: _, senderId, ...modifiedMessageInfo } = {
+					...message,
+					sender: {
+						...message.sender,
+						avatar: `${ process.env.HOST_URL }${message.sender?.avatar}`
+					},
+					files: message.files.map(file => {
+						return {
+							...file,
+							url: `${ process.env.HOST_URL }${file.url}`
+						};
+					}),
+					repliedMessage: {
+						...message.repliedMessage,
+						sender: {
+							...message.repliedMessage?.sender,
+							avatar: `${ process.env.HOST_URL }${message.repliedMessage?.sender.avatar}`
+						}
+					}
+				};;
 
 				await client.query("COMMIT");
 				res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: modifiedMessageInfo });
