@@ -19,7 +19,7 @@ class UserProfileController {
 					[Number(id)]
 				);
 				user = userProfileInfo.rows[0];
-				user.avatar = `${ process.env.HOST_URL }${user.avatar}`;
+				user.avatar = ` }${user.avatar}`;
 			}
 			else {
 				user = await userHelpers.getUserFromToken(req);
@@ -90,7 +90,7 @@ class UserProfileController {
 
 				const userAvatarLink = req.files 
 					? (await fsHelpers.uploadFiles(req.files, `/files`)).filelist[0].url
-					: `${ process.env.HOST_URL }/files/avatar.jpg`;
+					: `/files/avatar.jpg`;
                 
 				const updatedUserAvatar = await db.query(
 					` 
@@ -108,7 +108,7 @@ class UserProfileController {
 				}
 
 				//Удаляем файл предыдущего аватара из статики
-				if (process.env.HOST_URL && user.avatar !== `${ process.env.HOST_URL }/files/avatar.jpg`) {
+				if (process.env.HOST_URL && user.avatar !== `/files/avatar.jpg`) {
 					await fsHelpers.removeFiles([user?.avatar]);
 				}   
 

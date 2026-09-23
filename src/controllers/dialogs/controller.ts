@@ -200,26 +200,7 @@ class DialogsController {
 					message.repliedMessage = repliedMessageInfo.rows[0];
 				}
 
-				const { dialogId, senderId, ...modifiedMessageObject } = {
-					...message,
-					sender: {
-						...message.sender,
-						avatar: `${ process.env.HOST_URL }${message.sender?.avatar}`
-					},
-					files: message.files.map(file => {
-						return {
-							...file,
-							url: `${ process.env.HOST_URL }${file.url}`
-						};
-					}),
-					repliedMessage: {
-						...message.repliedMessage,
-						sender: {
-							...message.repliedMessage?.sender,
-							avatar: `${ process.env.HOST_URL }${message.repliedMessage?.sender.avatar}`
-						}
-					}
-				};
+				const { dialogId, senderId, ...modifiedMessageObject } = message;
 
 				res.status(200).json({ 
 					message: "Сообщение успешно отправлено", 
@@ -572,38 +553,14 @@ class DialogsController {
 				const isMember = await checkMember(userId, dialogId);
 
 				if (isMember) {
-					//Заменяем url на корректный для всех ссылок
-					const modifiedMessages = dialog.rows.map(message => {
-						return {
-							...message,
-							sender: {
-								...message.sender,
-								avatar: `${ process.env.HOST_URL }${message.sender.avatar}`
-							},
-							repliedMessage: message.repliedMessage && {
-								...message.repliedMessage,
-								sender: {
-									...message.repliedMessage.sender,
-									avatar: `${ process.env.HOST_URL }${message.repliedMessage.sender.avatar}`
-								},
-							},
-							files: message.files.map((file: IFile) => {
-								return {
-									...file,
-									url: `${ process.env.HOST_URL }${file.url}`
-								};
-							})
-						};
-					});
-
 					res.status(200).json({ 
 						message: "Успешное получение информации о диалоге", 
 						dialog: {
 							id: dialogId,
-							messages: modifiedMessages,
+							messages: dialog.rows,
 							opponent: {
 								...opponentInfo.rows[0],
-								avatar: `${ process.env.HOST_URL }${opponentInfo.rows[0].avatar}`
+								avatar: opponentInfo.rows[0].avatar
 							}
 						}
 					});
@@ -660,19 +617,7 @@ class DialogsController {
 					[userId]
 				);
 
-				let modifiedDialogs = [];
-				if (dialogs.rows[0].result) {
-					modifiedDialogs = dialogs.rows[0].result.map((dialog: any) => {
-						return {
-							...dialog,
-							opponent: {
-								...dialog.opponent,
-								avatar: `${ process.env.HOST_URL }${dialog.opponent.avatar}`
-							}
-						};
-					});
-				}
-				res.status(200).json({ message: "Список диалогов успешно получен", dialogs: modifiedDialogs });
+				res.status(200).json({ message: "Список диалогов успешно получен", dialogs: dialogs.rows[0].result });
 				return;
 			}
 		}  
@@ -926,18 +871,7 @@ class DialogsController {
                     `;
 
 					const result = await db.query(query, [dialogId, messageId]);
-					const modifiedResult = result.rows.map(row => {
-						return {
-							...row,
-							files: row.files.map((file: IFile) => {
-								return {
-									...file,
-									url: `${ process.env.HOST_URL }${file.url}`
-								};
-							})
-						};
-					});
-					res.status(200).json({ message: "Сообщения успешно получены", messages: modifiedResult });
+					res.status(200).json({ message: "Сообщения успешно получены", messages: result.rows });
 					return;
 				}
 			}

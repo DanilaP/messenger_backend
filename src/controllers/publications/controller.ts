@@ -26,15 +26,7 @@ class PublicationsController {
 			);
 			res.status(200).json({ 
 				message: "Успешное получение публикаций пользователя",
-				publications: userPublications.rows.map(publication => {
-					return {
-						...publication,
-						file: {
-							...publication.file,
-							url: `${ process.env.HOST_URL }${publication.file.url}`
-						}
-					};
-				})
+				publications: userPublications.rows
 			});
 			return;
 		}
@@ -107,7 +99,7 @@ class PublicationsController {
 						...createdPublicationInfo.rows[0],
 						file: {
 							...publicationFileInfo.rows[0],
-							url:`${ process.env.HOST_URL }${publicationFileInfo.rows[0].url}`
+							url: publicationFileInfo.rows[0].url
 						}
 					}
 				});
@@ -253,7 +245,7 @@ class PublicationsController {
                                 `,
 								[publicationId, uploadedFileInfo.filelist[0].url]
 							);
-							updatedPublicationFileUrl = `${ process.env.HOST_URL }${uploadedFileInfo.filelist[0].url}`;
+							updatedPublicationFileUrl = uploadedFileInfo.filelist[0].url;
 						}
 						else {
 							await client.query("ROLLBACK");

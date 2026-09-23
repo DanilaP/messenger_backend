@@ -384,7 +384,7 @@ class ChatController {
 				await client.query("COMMIT");
 				res.status(200).json({ 
 					message: "Успешное изменение аватара для чата", 
-					updatedFileUrl: `${ process.env.HOST_URL }${uploadedFileUrl}`
+					updatedFileUrl: uploadedFileUrl
 				});
 				return;
 			}
@@ -527,7 +527,7 @@ class ChatController {
 				const chatsSelectResult = await db.query(
 					`
 						SELECT
-							chats.id as "id",
+							chats.id,
 							chats.name,
 							chats.image,
 							json_build_object(
@@ -555,12 +555,7 @@ class ChatController {
 				);
 				res.status(200).json({ 
 					message: "Успешное получение информации о чатах", 
-					chats: chatsSelectResult.rows.map(chat => {
-						return {
-							...chat,
-							image: `${ process.env.HOST_URL }${chat.image}`
-						};
-					})
+					chats: chatsSelectResult.rows
 				});
 				return;	
 			}
@@ -697,26 +692,7 @@ class ChatController {
 					senderInfo: senderInfo.rows[0]
 				});
 
-				const { chatId: _, senderId, ...modifiedMessageInfo } = {
-					...message,
-					sender: {
-						...message.sender,
-						avatar: `${ process.env.HOST_URL }${message.sender?.avatar}`
-					},
-					files: message.files.map(file => {
-						return {
-							...file,
-							url: `${ process.env.HOST_URL }${file.url}`
-						};
-					}),
-					repliedMessage: {
-						...message.repliedMessage,
-						sender: {
-							...message.repliedMessage?.sender,
-							avatar: `${ process.env.HOST_URL }${message.repliedMessage?.sender.avatar}`
-						}
-					}
-				};;
+				const { chatId: _, senderId, ...modifiedMessageInfo } = message;
 
 				await client.query("COMMIT");
 				res.status(200).json({ message: "Сообщение успешно отправлено", createdMessage: modifiedMessageInfo });

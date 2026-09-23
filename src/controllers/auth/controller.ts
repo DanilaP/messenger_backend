@@ -57,7 +57,7 @@ class AuthController {
 							message: "Успешная регистрация", 
 							user: {
 								...result.rows[0],
-								avatar: `${ process.env.HOST_URL }${result.rows[0].avatar}`
+								avatar: result.rows[0].avatar
 							} 
 						});
 						return;
@@ -127,7 +127,7 @@ class AuthController {
 						message: "Успешный вход",
 						user: {
 							...userWithoutPassword,
-							avatar: `${ process.env.HOST_URL }${userWithoutPassword.avatar}`
+							avatar: userWithoutPassword.avatar
 						}
 					});
 					return;
