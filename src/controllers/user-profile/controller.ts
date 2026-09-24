@@ -19,7 +19,7 @@ class UserProfileController {
 					[Number(id)]
 				);
 				user = userProfileInfo.rows[0];
-				user.avatar = ` }${user.avatar}`;
+				user.avatar = `${user.avatar}`;
 			}
 			else {
 				user = await userHelpers.getUserFromToken(req);
