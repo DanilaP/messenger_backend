@@ -876,7 +876,6 @@ class DialogsController {
 					`;
 					
 					const result = await db.query(query, [dialogId, messageId]);
-					console.log(result.rows);
 					res.status(200).json({ message: "Сообщения успешно получены", messages: result.rows });
 					return;
 				}
