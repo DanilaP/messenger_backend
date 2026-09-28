@@ -824,7 +824,7 @@ class DialogsController {
 				}
 				else {
 					const query = `
-                        WITH full_data AS (
+						WITH full_data AS (
 							SELECT 
 								m.id,
 								m.is_read AS "isRead",
@@ -848,14 +848,19 @@ class DialogsController {
 									json_build_object(
 										'id', rm.id,
 										'text', rm.text,
-										'senderId', rm.sender_id
+										'sender', json_build_object(
+											'id', u.id,
+											'name', u.name,
+											'surname', u.surname,
+											'avatar', u.avatar
+										)
 									)
 								ELSE NULL END AS "repliedMessage",
 								ROW_NUMBER() OVER (ORDER BY TO_TIMESTAMP(m.date, 'DD:MM:YYYY HH24:MI:SS'), m.id) AS rn
 							FROM dialogs_messages m
 							LEFT JOIN dialogs_files f ON f.message_id = m.id
 							LEFT JOIN dialogs_messages rm ON rm.id = m.reply_message_id
-							JOIN users u ON u.id = m.sender_id 
+							JOIN users u ON u.id = m.sender_id
 							WHERE m.dialog_id = $1
 							GROUP BY 
 								m.id, m.is_read, m.text, m.date, m.sender_id, m.reply_message_id,
@@ -868,9 +873,10 @@ class DialogsController {
 						FROM full_data
 						WHERE rn BETWEEN (SELECT rn FROM target_rn) - 11 AND (SELECT rn FROM target_rn) + 11
 						ORDER BY ts ASC, id ASC
-                    `;
-
+					`;
+					
 					const result = await db.query(query, [dialogId, messageId]);
+					console.log(result.rows);
 					res.status(200).json({ message: "Сообщения успешно получены", messages: result.rows });
 					return;
 				}
