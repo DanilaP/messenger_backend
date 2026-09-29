@@ -90,7 +90,7 @@ class UserProfileController {
 
 				const userAvatarLink = req.files 
 					? (await fsHelpers.uploadFiles(req.files, `/files`)).filelist[0].url
-					: `/files/avatar.jpg`;
+					: `/files/base-user-avatar.png`;
                 
 				const updatedUserAvatar = await db.query(
 					` 
