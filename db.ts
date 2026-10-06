@@ -1,6 +1,9 @@
-import { Pool, QueryResult, QueryResultRow } from "pg";
+import { Pool, QueryResult, QueryResultRow, types } from "pg";
 import dotenv from "dotenv";
 dotenv.config();
+
+// INT8 (BIGINT/BIGSERIAL, OID 20) возвращаем как number вместо string
+types.setTypeParser(types.builtins.INT8, (value: string) => parseInt(value, 10));
 
 const connectionString = process.env.DB_URL as string;
 

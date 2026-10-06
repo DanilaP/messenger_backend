@@ -166,18 +166,6 @@ class DialogsController {
 
 				await client.query("COMMIT");
 
-				const senderInfo = await db.query(
-					"SELECT id, name, surname, avatar FROM users WHERE id = $1",
-					[userId]
-				);
-
-				broadcastMessage([opponentId], {
-					type: "new_message_dialog",
-					dialogId: message.dialogId,
-					message: message,
-					senderInfo: senderInfo.rows[0]
-				});
-
 				if (replyMessageId !== null) {
 					const repliedMessageInfo = await client.query(
 						`
@@ -201,6 +189,18 @@ class DialogsController {
 				}
 
 				const { dialogId, senderId, ...modifiedMessageObject } = message;
+
+				const senderInfo = await db.query(
+					"SELECT id, name, surname, avatar FROM users WHERE id = $1",
+					[userId]
+				);
+
+				broadcastMessage([opponentId], {
+					type: "new_message_dialog",
+					dialogId: message.dialogId,
+					message: modifiedMessageObject,
+					senderInfo: senderInfo.rows[0]
+				});
 
 				res.status(200).json({ 
 					message: "Сообщение успешно отправлено", 
