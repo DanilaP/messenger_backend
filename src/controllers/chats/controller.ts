@@ -83,7 +83,7 @@ class ChatController {
 				`
                     INSERT INTO chats (name, image, description, date_of_creation) 
                     VALUES ($1, $2, $3, $4) 
-                    RETURNING id, name, image, description, date_of_creation
+                    RETURNING id, name, image, description, date_of_creation as "dateOfCreation"
                 `,
 				[name, defaultImage, description, creationDate]
 			);
@@ -172,7 +172,7 @@ class ChatController {
 					`
 						INSERT INTO chats_invitations (chat_id, user_id) 
 						VALUES ($1, $2) 
-						RETURNING id, chat_id, user_id
+						RETURNING id, chat_id as "chatId", user_id as "userId"
 					`,
 					[chatId, memberId]
 				);
