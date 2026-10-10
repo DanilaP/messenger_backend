@@ -1114,6 +1114,103 @@ class ChatController {
 			return;
 		} 
 	}
+	static async deleteChat(req: Request, res: Response) {
+		const client = await db.getClient();
+		
+		try {
+			await client.query("BEGIN");
+		
+			const chatId = Number(req.query.id);
+			const userId = userHelpers.getUserIdFromToken(req);
+			
+			if (chatId && userId) {
+				//Проверяем наличие пермишена на удаление чата
+				const permissions = await getChatMemberPermissions(userId, chatId);
+				if (!permissions.includes("delete_chat")) {
+					await client.query("ROLLBACK");
+					res.status(403).json({ message: "Отказано в доступе" });
+					return;
+				}
+				//Удаляем ссылки на файлы статики из бд
+				const deletedFilesResult = await client.query(
+					`
+						DELETE FROM chats_files
+						WHERE message_id IN (SELECT id FROM chats_messages WHERE chat_id = $1)
+						RETURNING url
+					`,
+					[chatId]
+				);
+				//Удаляем статику 
+				const deletedFilesUrls = deletedFilesResult.rows.map(row => {
+					return row.url;
+				});
+				const deleteFilesStatus = await fsHelpers.removeFiles(deletedFilesUrls);
+		
+				if (deleteFilesStatus.status === 500) {
+					await client.query("ROLLBACK");
+					res.status(500).json({ 
+						message: "Ошибка при удалении чата. Ошибка при удалении медиа файлов" 
+					});
+					return;
+				}
+				//Удаляем сообщения из бд
+				await client.query(
+					`
+						DELETE FROM chats_messages
+						WHERE chat_id = $1
+					`,
+					[chatId]
+				);
+				//Удаляем привязку участников к диалогу
+				await client.query(
+					`
+						DELETE FROM chats_members
+						WHERE chat_id = $1
+					`,
+					[chatId]
+				);
+				//Удаляем приглашенияв в чат
+				await client.query(
+					`
+						DELETE FROM chats_invitations
+						WHERE chat_id = $1
+					`,
+					[chatId]
+				);
+				//Удаляем сам диалог
+				const deletedDialogsInfo = await client.query(
+					`
+						DELETE FROM chats
+						WHERE id = $1
+					`,
+					[chatId]
+				);
+				if (deletedDialogsInfo.rowCount === 0) {
+					await client.query("ROLLBACK");
+					res.status(500).json({
+						message: "Ошибка при удалении чата, чат не найден" 
+					});
+					return;
+				}
+				await client.query("COMMIT");
+				res.status(200).json({ message: "Чат успешно удален" });
+				return;
+			}
+			await client.query("ROLLBACK");
+			res.status(400).json({ message: "Ошибка при удалении чата, чат не найден" });
+			return;
+		}
+		catch (error) {
+			await client.query("ROLLBACK");
+		
+			res.status(500).json({ message: "Ошибка при удалении диалога" });
+			console.log(error);
+			return;
+		}
+		finally {
+			client.release();
+		}
+	}
 }
 
 export default ChatController;

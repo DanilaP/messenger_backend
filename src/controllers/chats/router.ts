@@ -3,6 +3,7 @@ import ChatController from "./controller";
 const router = Router();
 
 router.get("/", ChatController.getChats);
+router.delete("/", ChatController.deleteChat);
 router.post("/", ChatController.createChat);
 router.patch("/", ChatController.changeChatInfo);
 router.get("/invitations", ChatController.getChatsInvitations);
