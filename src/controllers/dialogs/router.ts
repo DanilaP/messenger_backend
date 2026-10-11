@@ -10,5 +10,6 @@ router.post("/message/scroll", DialogsController.scrollToMessage);
 router.get("/files", DialogsController.getDialogFiles);
 router.get("/", DialogsController.getUserDialogsInfo);
 router.delete("/", DialogsController.deleteDialog);
+router.post("/exists", DialogsController.isDialogBetweenUsersExists);
 
 export default router;

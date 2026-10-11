@@ -3,7 +3,7 @@ import { db } from "../../../db";
 import { IDialogsMessage } from "../../models/dialogs_messages/dialogs_messages";
 import { IDialogs } from "../../models/dialogs/dialogs";
 import { insertFiles } from "../../models/dialogs_files/model-helpers";
-import { insertDialogMembers } from "../../models/dialogs_members/model-helpers";
+import { insertDialogMembers, isDialogBetweenUsersExists } from "../../models/dialogs_members/model-helpers";
 import { IDialogsMembers } from "../../models/dialogs_members/dialogs_members";
 import { broadcastMessage } from "../../websocket/websocket";
 import { IFile } from "../../models/dialogs_files/dialogs_files";
@@ -887,6 +887,29 @@ class DialogsController {
 		}
 		catch (error) {
 			res.status(500).json({ message: "Ошибка при скролле к сообщению" });
+			console.log(error);
+			return;
+		}
+	}
+	static async isDialogBetweenUsersExists(req: Request, res: Response) {
+		try {   
+			const { opponentId } = req.body;
+			const userId = userHelpers.getUserIdFromToken(req);
+			
+			if (opponentId) {
+				const isDialogBetweenUsersExistsResponse = await isDialogBetweenUsersExists(userId, opponentId);
+				res.status(200).json({ 
+					message: "Информация о диалоге успешно получена", 
+					dialogId: isDialogBetweenUsersExistsResponse.dialogId
+				});
+				return;
+			}
+
+			res.status(400).json({ message: "Тело запроса должно соответствовать ожидаемой структуре" });
+			return;
+		}
+		catch (error) {
+			res.status(500).json({ message: "Ошибка при получении информации о диалоге" });
 			console.log(error);
 			return;
 		}
