@@ -1211,6 +1211,57 @@ class ChatController {
 			client.release();
 		}
 	}
+	static async getBasicChatInfo(req: Request, res: Response) {
+		try {
+			const { chatId } = req.body;
+			const userId = userHelpers.getUserIdFromToken(req);
+
+			if (chatId) {
+				const isMember = checkChatMember(chatId, userId);
+				if (!isMember) {
+					res.status(403).json({ message: "Вы не являетесь участником данного чата" });
+					return;
+				}
+				const chatInfo = await db.query(
+					`
+						select 
+							chats.id,
+							chats.image,
+							chats.name,
+							chats.description,
+							chats.date_of_creation as "dateOfCreation",
+							COALESCE(
+								json_agg(
+									json_build_object(
+										'id', users.id,
+										'name', users.name,
+										'surname', users.surname,
+										'avatar', users.avatar
+									)
+									ORDER BY users.id
+								) FILTER (WHERE users.id IS NOT NULL),
+								'[]'::json
+							) AS members
+						from chats_members
+						join chats on chats.id = $1
+						join users on users.id = chats_members.user_id
+						where chat_id = $1
+						group by chats.id
+					`,
+					[chatId]
+				);
+				res.status(200).json({ message: "Информация о чате успешно получена", chat: chatInfo.rows[0] });
+				return;
+			}
+			res.status(400).json({ message: "Чат не найден" });
+			return;
+		}
+		catch (error) {
+			res.status(500).json({ message: "Ошибка при получении информации о чате" });
+			console.log(error);
+			return;
+		}
+	}
 }
 
 export default ChatController;

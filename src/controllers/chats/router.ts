@@ -17,5 +17,6 @@ router.post("/message/delete", ChatController.deleteMessage);
 router.post("/message/edit", ChatController.changeMessage);
 router.post("/message/read", ChatController.readMessagesInCertainChat);
 router.post("/message/scroll", ChatController.scrollToMessage);
+router.post("/get-basic-info", ChatController.getBasicChatInfo);
 
 export default router;
