@@ -1,6 +1,6 @@
 import { db } from "../../db";
 
-export async function getChatMembers(chatId: number, mode: "prev" | "next", cursorId: number, limit = 20) {
+export async function getChatMembers(chatId: number, mode: "prev" | "next", cursorId: number | null, limit = 20) {
 	const isPrev = mode === "prev";
 	const comparison = isPrev ? "<" : ">";   // направление относительно курсора
 	const order      = isPrev ? "DESC" : "ASC";

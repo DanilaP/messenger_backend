@@ -1254,9 +1254,16 @@ class ChatController {
 	}
 	static async getChatMembers(req: Request, res: Response) {
 		try {
-			const chatId = Number(req.query.chatId);
-			const cursorId = Number(req.query.cursorId);
-			const mode = req.query.mode as "prev" | "next";
+			const chatIdRaw   = req.query.chatId;
+			const cursorIdRaw = req.query.cursorId;
+
+			const chatId = chatIdRaw != null && chatIdRaw !== "" ? Number(chatIdRaw) : null;
+			const cursorId =
+				cursorIdRaw != null && cursorIdRaw !== "" && cursorIdRaw !== "null"
+					? Number(cursorIdRaw)
+					: null;
+			const mode = (req.query.mode as "prev" | "next") ?? "next";
+			
 			const userId = userHelpers.getUserIdFromToken(req);
 
 			if (chatId) {
