@@ -10,6 +10,7 @@ import { addMemberToChat, getChatMembersIds, removeMemberFromChat } from "../../
 import { IChatMessage } from "../../models/chats_messages/chats_messages";
 import { insertFilesToChatsFiles } from "../../models/chats_files/model-helpers";
 import { broadcastMessage } from "../../websocket/websocket";
+import { getChatMembers } from "../../helpers/chats-users-helpers";
 import fsHelpers, { IFile } from "../../helpers/fs-helpers";
 import moment from "moment";
 import userHelpers from "../../helpers/user-helpers";
@@ -1230,18 +1231,7 @@ class ChatController {
 							chats.name,
 							chats.description,
 							chats.date_of_creation as "dateOfCreation",
-							COALESCE(
-								json_agg(
-									json_build_object(
-										'id', users.id,
-										'name', users.name,
-										'surname', users.surname,
-										'avatar', users.avatar
-									)
-									ORDER BY users.id
-								) FILTER (WHERE users.id IS NOT NULL),
-								'[]'::json
-							) AS members
+							COUNT(users.id)::int AS "membersCount"
 						from chats_members
 						join chats on chats.id = $1
 						join users on users.id = chats_members.user_id
@@ -1258,6 +1248,35 @@ class ChatController {
 		}
 		catch (error) {
 			res.status(500).json({ message: "Ошибка при получении информации о чате" });
+			console.log(error);
+			return;
+		}
+	}
+	static async getChatMembers(req: Request, res: Response) {
+		try {
+			const chatId = Number(req.query.chatId);
+			const cursorId = Number(req.query.cursorId);
+			const mode = req.query.mode as "prev" | "next";
+			const userId = userHelpers.getUserIdFromToken(req);
+
+			if (chatId) {
+				const isMember = await checkChatMember(chatId, userId);
+				if (!isMember) {
+					res.status(403).json({ message: "Доступ закрыт. Вы не являетесь участником данного чата" });
+					return;
+				}
+				else {
+					const members = await getChatMembers(chatId, mode, cursorId, 20);
+					res.status(200).json({ message: "Информация об участниках чата успешно получена", members });
+					return;
+				}
+			}
+
+			res.status(400).json({ message: "Ошибка при получении информации об участниках чата. Чат не найден" });
+			return;
+		}
+		catch (error) {
+			res.status(500).json({ message: "Ошибка при получении информации об участниках чата" });
 			console.log(error);
 			return;
 		}

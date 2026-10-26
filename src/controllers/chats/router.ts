@@ -8,6 +8,7 @@ router.post("/", ChatController.createChat);
 router.patch("/", ChatController.changeChatInfo);
 router.get("/invitations", ChatController.getChatsInvitations);
 router.delete("/members", ChatController.removeMemberFromChat);
+router.get("/members", ChatController.getChatMembers);
 router.patch("/avatar", ChatController.changeChatAvatar);
 router.post("/send-invitation", ChatController.sendInvitationToChat);
 router.post("/accept-invitation", ChatController.acceptInvitationToChat);
